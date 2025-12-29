@@ -141,7 +141,7 @@ python main.py data/qun.json --poster -v
 
 ## 📁 数据格式
 
-工具接受特定格式的 JSON 文件，通常为微信聊天记录导出工具生成：
+工具接受特定格式的 JSON 文件，需要使用 [EchoTrace](https://github.com/ycccccccy/echotrace) 导出微信聊天记录：
 
 ```json
 {
