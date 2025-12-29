@@ -119,13 +119,19 @@ def _standardize_fields(df: pd.DataFrame) -> pd.DataFrame:
 def _add_time_columns(df: pd.DataFrame) -> pd.DataFrame:
     """
     添加时间相关列:
-    - timestamp: datetime 对象
+    - timestamp: datetime 对象（本地时区）
     - hour: 小时 (0-23)
     - date: 日期字符串 (YYYY-MM-DD)
     - weekday: 星期几 (0=周一, 6=周日)
     """
-    # 将 Unix 时间戳转换为 datetime
-    df['timestamp'] = pd.to_datetime(df['timestamp_raw'], unit='s')
+    # 将 Unix 时间戳转换为 datetime（UTC）
+    df['timestamp'] = pd.to_datetime(df['timestamp_raw'], unit='s', utc=True)
+    
+    # 转换为本地时区（北京时间 UTC+8）
+    df['timestamp'] = df['timestamp'].dt.tz_convert('Asia/Shanghai')
+    
+    # 移除时区信息（保留本地时间值）
+    df['timestamp'] = df['timestamp'].dt.tz_localize(None)
     
     # 添加时间维度列
     df['hour'] = df['timestamp'].dt.hour
