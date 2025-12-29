@@ -1,0 +1,23 @@
+# 微信群聊分析工具依赖
+# Python 3.10+ 推荐
+
+# 数据处理
+pandas>=2.0.0
+
+# 中文分词
+jieba>=0.42.1
+
+# LLM API 调用
+openai>=1.0.0
+
+# HTML 模板渲染
+Jinja2>=3.1.0
+
+# 环境变量管理
+python-dotenv>=1.0.0
+
+# 向量分析（语义聚类）
+sentence-transformers>=2.2.0
+scikit-learn>=1.3.0
+tqdm>=4.66.0
+numpy>=1.24.0
