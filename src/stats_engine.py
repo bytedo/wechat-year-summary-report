@@ -6,13 +6,13 @@ stats_engine.py - 统计分析引擎
 
 from collections import Counter
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any, Optional, Set
 
 import jieba
 import pandas as pd
 
 
-def calculate_stats(df: pd.DataFrame, stopwords_path: str = None) -> dict:
+def calculate_stats(df: pd.DataFrame, stopwords_path: Optional[str] = None) -> Dict[str, Any]:
     """
     计算所有统计指标。
     
@@ -34,7 +34,7 @@ def calculate_stats(df: pd.DataFrame, stopwords_path: str = None) -> dict:
     return stats
 
 
-def _get_basic_stats(df: pd.DataFrame) -> dict:
+def _get_basic_stats(df: pd.DataFrame) -> Dict[str, Any]:
     """
     获取基础统计指标。
     """
@@ -49,7 +49,7 @@ def _get_basic_stats(df: pd.DataFrame) -> dict:
     }
 
 
-def _get_top_users(df: pd.DataFrame, top_n: int = 10) -> List[dict]:
+def _get_top_users(df: pd.DataFrame, top_n: int = 10) -> List[Dict[str, Any]]:
     """
     获取最活跃用户排行榜（Top N）。
     
@@ -69,7 +69,7 @@ def _get_top_users(df: pd.DataFrame, top_n: int = 10) -> List[dict]:
     ]
 
 
-def _get_daily_trend(df: pd.DataFrame) -> List[dict]:
+def _get_daily_trend(df: pd.DataFrame) -> List[Dict[str, Any]]:
     """
     获取每日消息趋势。
     
@@ -85,7 +85,7 @@ def _get_daily_trend(df: pd.DataFrame) -> List[dict]:
     ]
 
 
-def get_monthly_summary(df: pd.DataFrame) -> List[dict]:
+def get_monthly_summary(df: pd.DataFrame) -> List[Dict[str, Any]]:
     """
     获取每月消息统计和样本消息。
     
@@ -125,7 +125,7 @@ def get_monthly_summary(df: pd.DataFrame) -> List[dict]:
     return monthly_data
 
 
-def _get_hourly_distribution(df: pd.DataFrame) -> List[dict]:
+def _get_hourly_distribution(df: pd.DataFrame) -> List[Dict[str, int]]:
     """
     获取 24 小时活跃分布。
     
@@ -141,7 +141,7 @@ def _get_hourly_distribution(df: pd.DataFrame) -> List[dict]:
     ]
 
 
-def _load_stopwords(stopwords_path: str = None) -> set:
+def _load_stopwords(stopwords_path: Optional[str] = None) -> Set[str]:
     """
     加载停用词表。
     """
@@ -163,7 +163,7 @@ def _load_stopwords(stopwords_path: str = None) -> set:
     return stopwords
 
 
-def _get_word_frequency(df: pd.DataFrame, stopwords_path: str = None, top_n: int = 50) -> List[dict]:
+def _get_word_frequency(df: pd.DataFrame, stopwords_path: Optional[str] = None, top_n: int = 50) -> List[Dict[str, Any]]:
     """
     使用 jieba 分词进行词频统计。
     
@@ -199,7 +199,7 @@ def _get_word_frequency(df: pd.DataFrame, stopwords_path: str = None, top_n: int
     ]
 
 
-def calculate_memories_stats(df: pd.DataFrame, top_users: List[dict]) -> dict:
+def calculate_memories_stats(df: pd.DataFrame, top_users: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     计算怀旧数据指标。
     
@@ -218,7 +218,7 @@ def calculate_memories_stats(df: pd.DataFrame, top_users: List[dict]) -> dict:
     }
 
 
-def _find_hot_messages(df: pd.DataFrame, time_window_minutes: int = 2, min_replies: int = 5) -> List[dict]:
+def _find_hot_messages(df: pd.DataFrame, time_window_minutes: int = 2, min_replies: int = 5) -> List[Dict[str, Any]]:
     """
     检测引发"回复热潮"的消息。
     逻辑：一条消息发出后 N 分钟内，后续紧跟 >M 条消息。
@@ -261,7 +261,7 @@ def _find_hot_messages(df: pd.DataFrame, time_window_minutes: int = 2, min_repli
     return hot_messages[:20]
 
 
-def _find_peak_day(df: pd.DataFrame) -> dict:
+def _find_peak_day(df: pd.DataFrame) -> Dict[str, Any]:
     """
     找出历史上消息数量最多的一天。
     
@@ -287,7 +287,7 @@ def _find_peak_day(df: pd.DataFrame) -> dict:
     }
 
 
-def _find_silence_breaker(df: pd.DataFrame, silence_hours: int = 24) -> dict:
+def _find_silence_breaker(df: pd.DataFrame, silence_hours: int = 24) -> Optional[Dict[str, Any]]:
     """
     找出打破沉默（冷场 > N 小时）的消息。
     
@@ -320,7 +320,7 @@ def _find_silence_breaker(df: pd.DataFrame, silence_hours: int = 24) -> dict:
     return breaker_msg
 
 
-def _get_first_messages(df: pd.DataFrame, top_users: List[dict]) -> List[dict]:
+def _get_first_messages(df: pd.DataFrame, top_users: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     获取活跃用户的第一句话。
     
@@ -348,7 +348,7 @@ def _get_first_messages(df: pd.DataFrame, top_users: List[dict]) -> List[dict]:
     return first_messages
 
 
-def format_stats_for_display(stats: dict) -> dict:
+def format_stats_for_display(stats: Dict[str, Any]) -> Dict[str, Any]:
     """
     格式化统计数据用于前端显示。
     """

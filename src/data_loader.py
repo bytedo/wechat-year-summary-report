@@ -8,12 +8,12 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Any, Tuple, Optional, Union
 
 import pandas as pd
 
 
-def load_chat_data(file_path: str) -> pd.DataFrame:
+def load_chat_data(file_path: str) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """
     加载并清洗微信群聊 JSON 数据。
     
@@ -144,7 +144,7 @@ def _add_time_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def get_session_info(file_path: str) -> dict:
+def get_session_info(file_path: str) -> Dict[str, Any]:
     """
     获取会话基本信息。
     

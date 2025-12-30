@@ -68,6 +68,11 @@
         height: 100vh;
       }
 
+      .swiper-wrapper {
+        display: flex !important;
+        flex-direction: row !important;
+      }
+
       .swiper-slide {
         display: flex;
         flex-direction: column;
@@ -78,6 +83,9 @@
         overflow: hidden;
         position: relative;
         background-color: var(--wc-bg); /* Global Background */
+        width: 100% !important;
+        height: 100vh !important;
+        flex-shrink: 0;
       }
 
       /* WeChat Style Card */
@@ -219,12 +227,23 @@
       }
 
       /* Swiper Pagination */
+      .swiper-pagination {
+        bottom: 20px !important;
+        left: 50% !important;
+        transform: translateX(-50%);
+        width: auto !important;
+      }
       .swiper-pagination-bullet {
         background: #ccc;
         opacity: 1;
+        width: 8px;
+        height: 8px;
+        margin: 0 4px !important;
       }
       .swiper-pagination-bullet-active {
         background: var(--wc-green);
+        width: 20px;
+        border-radius: 4px;
       }
       
       /* Slide Bottom Hint */
@@ -312,7 +331,7 @@
             </div>
             
              <p class="text-gray-400 text-xs mt-12 animate-enter delay-400">
-              下滑开启回忆 &darr;
+              左滑开启回忆 &larr;
             </p>
           </div>
         </div>
@@ -467,44 +486,6 @@
         </div>
         {% endfor %}
 
-        <!-- GOLDEN QUOTES -->
-        <div class="swiper-slide text-left items-start overflow-hidden">
-           <div class="w-full max-w-md mx-auto h-full flex flex-col pt-12 pb-12">
-              <h2 class="text-2xl font-bold text-wc-primary mb-6 animate-enter px-2">名场面</h2>
-              
-              <div class="overflow-y-auto pr-2 space-y-5 flex-1" style="scrollbar-width: none;">
-                 {% for quote in golden_quotes %}
-                 {% set delay = loop.index * 0.1 %}
-                 <div class="animate-enter" data-delay="{{ delay }}s">
-                    <div class="flex items-start mb-1">
-                       <div class="w-8 h-8 rounded bg-gray-200 flex items-center justify-center text-gray-500 text-xs font-bold mr-2 flex-shrink-0">
-                         {{ quote.user[:1] }}
-                       </div>
-                       <div>
-                          <div class="text-xs text-gray-400 mb-1 flex items-center gap-2">
-                            {{ quote.user }}
-                            {% if quote.category %}
-                              <span class="bg-gray-100 text-gray-400 px-1 rounded text-[10px]">{{ quote.category }}</span>
-                            {% endif %}
-                          </div>
-                          <!-- Use green bubble for "me" style or just white bubble for general -->
-                          <div class="bg-white p-3 rounded-tr-lg rounded-bl-lg rounded-br-lg shadow-sm text-sm text-gray-800 leading-relaxed border border-gray-100 relative">
-                             {{ quote.content }}
-                          </div>
-                          {% if quote.reason %}
-                          <div class="text-[10px] text-gray-400 mt-1 ml-1 pl-2 border-l-2 border-gray-200">{{ quote.reason }}</div>
-                          {% endif %}
-                       </div>
-                    </div>
-                 </div>
-                 {% endfor %}
-                 
-                 <!-- Footer Spacing -->
-                 <div class="h-10"></div>
-              </div>
-           </div>
-        </div>
-
         <!-- FUN FACTS -->
         <div class="swiper-slide">
            <div class="w-full max-w-md">
@@ -590,26 +571,33 @@
         <div class="swiper-slide">
            <div class="w-full max-w-md h-full flex flex-col pt-12">
               <h2 class="text-2xl font-bold text-wc-primary mb-2 animate-enter px-2">群友群相</h2>
-              <p class="text-sm text-gray-400 mb-6 animate-enter delay-100 px-2 pl-2">MBTI 人格大揭秘</p>
+              <p class="text-sm text-gray-400 mb-4 animate-enter delay-100 px-2">看看谁是什么人格 ✨</p>
               
-              <div class="overflow-y-auto px-2 pb-12 space-y-4 flex-1 swiper-no-swiping" style="scrollbar-width: none;">
-                 {% for profile in user_profiles_mbti %}
-                 <div class="wechat-card p-4 animate-enter" data-delay="{{ loop.index * 0.1 }}s">
-                    <div class="flex items-center mb-3">
-                       <div class="w-10 h-10 rounded bg-gradient-to-br from-green-400 to-blue-500 text-white flex items-center justify-center font-bold text-lg mr-3 shadow-sm">{{ profile.user[:1] }}</div>
-                       <div class="flex-1">
-                          <div class="flex items-center justify-between">
-                             <div class="font-bold text-wc-primary">{{ profile.user }}</div>
-                             <div class="bg-indigo-50 text-indigo-600 text-xs px-2 py-0.5 rounded-full font-bold border border-indigo-100">{{ profile.mbti }}</div>
+              <div class="overflow-y-auto px-2 pb-12 flex-1 swiper-no-swiping" style="scrollbar-width: none;">
+                 <div class="space-y-3">
+                    {% for profile in user_profiles_mbti[:10] %}
+                    <!-- 消息气泡样式 -->
+                    <div class="animate-enter flex items-start gap-2 {{ 'flex-row-reverse' if loop.index % 2 == 0 else '' }}" data-delay="{{ loop.index * 0.12 }}s">
+                       <div class="max-w-[85%]">
+                          <!-- 用户名和MBTI标签 -->
+                          <div class="flex items-center gap-2 mb-1 {{ 'flex-row-reverse' if loop.index % 2 == 0 else '' }}">
+                             <span class="text-xs font-medium text-gray-600">{{ profile.user }}</span>
+                             <span class="px-1.5 py-0.5 text-[10px] font-bold rounded {{ 'bg-green-100 text-green-600' if loop.index % 4 == 1 else 'bg-blue-100 text-blue-600' if loop.index % 4 == 2 else 'bg-purple-100 text-purple-600' if loop.index % 4 == 3 else 'bg-orange-100 text-orange-600' }}">{{ profile.mbti }}</span>
                           </div>
-                          <div class="text-xs text-gray-400 mt-0.5">{{ profile.persona }}</div>
+                          <!-- 消息气泡 -->
+                          <div class="p-3 rounded-2xl shadow-sm text-sm leading-relaxed {{ 'bg-[#95ec69] rounded-tr-sm' if loop.index % 2 == 0 else 'bg-white border border-gray-100 rounded-tl-sm' }}">
+                             <span class="font-medium">{{ profile.persona }}</span>
+                             {% if profile.description and profile.description|length < 50 %}
+                             <span class="text-gray-500 ml-1">· {{ profile.description }}</span>
+                             {% endif %}
+                          </div>
                        </div>
                     </div>
-                    <div class="text-sm text-gray-600 bg-gray-50 p-3 rounded leading-relaxed">
-                       {{ profile.description }}
-                    </div>
+                    {% endfor %}
                  </div>
-                 {% endfor %}
+                 
+                 <!-- 底部留白 -->
+                 <div class="h-8"></div>
               </div>
            </div>
         </div>
@@ -713,7 +701,7 @@
 
       // --- Swiper & Animations ---
       const swiper = new Swiper(".swiper", {
-        direction: "vertical",
+        direction: "horizontal",
         slidesPerView: 1,
         spaceBetween: 0,
         mousewheel: true,
