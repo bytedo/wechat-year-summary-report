@@ -131,12 +131,25 @@ class SemanticAnalyzer:
         # Step 2: 聚类
         cluster_labels, cluster_centers = self._cluster(embeddings)
         
-        # Step 3: 降维
-        coords_2d = self._reduce_dimensions(embeddings)
+        # Step 3: 降维 (仅用于可视化，数据量大时采样)
+        MAX_VIS_SAMPLES = 3000
+        n_samples = len(embeddings)
+        
+        if n_samples > MAX_VIS_SAMPLES:
+            print(f"   📉 数据量较大 ({n_samples})，随机采样 {MAX_VIS_SAMPLES} 条用于可视化...")
+            np.random.seed(42)
+            vis_indices = np.random.choice(n_samples, MAX_VIS_SAMPLES, replace=False)
+            vis_embeddings = embeddings[vis_indices]
+        else:
+            vis_indices = np.arange(n_samples)
+            vis_embeddings = embeddings
+            
+        coords_2d = self._reduce_dimensions(vis_embeddings)
         
         # 构建结果
         result = self._build_result(
-            valid_df, embeddings, cluster_labels, cluster_centers, coords_2d
+            valid_df, embeddings, cluster_labels, cluster_centers, 
+            coords_2d, vis_indices
         )
         
         return result
@@ -168,24 +181,35 @@ class SemanticAnalyzer:
         # 尝试加载缓存
         if use_cache and cache_path.exists():
             print("   📁 加载已缓存的向量数据...")
-            with open(cache_path, 'rb') as f:
-                cached = pickle.load(f)
-                if cached.get('model') == self.model_name:
-                    print(f"   ✓ 已加载 {len(contents)} 条消息的向量缓存")
-                    return cached['embeddings']
-        
+            try:
+                with open(cache_path, 'rb') as f:
+                    cached = pickle.load(f)
+                    cached_embeddings = cached.get('embeddings')
+                    if (cached.get('model') == self.model_name and 
+                        cached_embeddings is not None and 
+                        len(cached_embeddings) == len(contents)):
+                        print(f"   ✓ 已加载 {len(contents)} 条消息的向量缓存")
+                        return cached_embeddings
+                    else:
+                        print(f"   ⚠️ 缓存失效 (模型或数量不匹配): 缓存={len(cached_embeddings) if cached_embeddings is not None else 0}, 当前={len(contents)}")
+            except Exception as e:
+                print(f"   ⚠️ 读取缓存出错: {e}")
+
         # 计算向量
         print("   🔢 正在计算文本向量...")
         embeddings = self._encode_with_progress(contents)
         
         # 保存缓存
         if use_cache:
-            with open(cache_path, 'wb') as f:
-                pickle.dump({
-                    'model': self.model_name,
-                    'embeddings': embeddings
-                }, f)
-            print(f"   💾 向量已缓存到 {cache_path.name}")
+            try:
+                with open(cache_path, 'wb') as f:
+                    pickle.dump({
+                        'model': self.model_name,
+                        'embeddings': embeddings
+                    }, f)
+                print(f"   💾 向量已缓存到 {cache_path.name}")
+            except Exception as e:
+                print(f"   ⚠️ 写入缓存出错: {e}")
         
         return embeddings
     
@@ -250,26 +274,27 @@ class SemanticAnalyzer:
         embeddings: np.ndarray,
         labels: np.ndarray,
         centers: np.ndarray,
-        coords: np.ndarray
+        coords: np.ndarray,
+        vis_indices: np.ndarray
     ) -> Dict:
         """构建分析结果。"""
-        # 散点图数据
+        # 散点图数据 (基于采样后的 indices)
         scatter_data = []
-        for i in range(len(df)):
+        for i, original_idx in enumerate(vis_indices):
             scatter_data.append({
                 'x': float(coords[i, 0]),
                 'y': float(coords[i, 1]),
-                'cluster_id': int(labels[i]),
-                'content': df.iloc[i]['content'][:100],  # 截断过长内容
-                'user': df.iloc[i]['user']
+                'cluster_id': int(labels[original_idx]),
+                'content': df.iloc[original_idx]['content'][:100],  # 截断过长内容
+                'user': df.iloc[original_idx]['user']
             })
         
-        # 每个聚类的代表性消息（距离中心最近的消息）
+        # 每个聚类的代表性消息（距离中心最近的消息）- 使用全量数据计算
         cluster_representatives = self._find_representatives(
             df, embeddings, labels, centers
         )
         
-        # 聚类统计
+        # 聚类统计 - 使用全量数据
         cluster_stats = []
         for c in range(self.n_clusters):
             cluster_mask = labels == c
@@ -329,7 +354,8 @@ class SemanticAnalyzer:
     
     def _compute_cache_key(self, contents: List[str]) -> str:
         """计算内容列表的哈希值用于缓存。"""
-        combined = ''.join(contents[:100])  # 使用前100条消息计算哈希
+        # 使用 长度 + 前100条 + 后100条 组合计算哈希，兼顾速度和准确性
+        combined = str(len(contents)) + ''.join(contents[:100]) + ''.join(contents[-100:])
         return hashlib.md5(combined.encode()).hexdigest()[:12]
     
     def _empty_result(self) -> Dict:

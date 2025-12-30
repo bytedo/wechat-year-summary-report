@@ -122,6 +122,46 @@ class WeeklyAnalyzer:
         ]
 
 
+    def get_weekly_samples(self, max_per_week: int = 1000) -> List[Dict[str, Any]]:
+        """
+        获取每周的消息样本用于 AI 分析。
+        
+        参数:
+            max_per_week: 每周最大样本数
+            
+        返回:
+            [{'week': '2024-W01', 'messages': [...]}, ...]
+        """
+        samples = []
+        for year_week, group in self.df.groupby('year_week'):
+            # 如果消息数超过限制，优先保留"热门"消息（这里简单用长度和时间分布做均匀采样）
+            # 也可以结合 stats_engine 的逻辑筛选回复多的
+            if len(group) > max_per_week:
+                # 简单均匀采样，保持时间分布
+                step = len(group) // max_per_week
+                week_msgs = group.iloc[::step].head(max_per_week)
+            else:
+                week_msgs = group
+            
+            # 格式化消息
+            msgs = []
+            for _, row in week_msgs.iterrows():
+                msgs.append({
+                    'user': row['user'],
+                    'content': row['content'],
+                    'date': row['date'],
+                    'timestamp': row['timestamp']
+                })
+            
+            samples.append({
+                'week': year_week,
+                'week_start': group['week_start'].iloc[0].strftime('%Y-%m-%d'),
+                'messages': msgs
+            })
+            
+        return samples
+
+
 def get_weekly_analysis(df: pd.DataFrame) -> List[Dict[str, Any]]:
     """
     便捷函数：执行周度分析。
@@ -134,3 +174,10 @@ def get_weekly_analysis(df: pd.DataFrame) -> List[Dict[str, Any]]:
     """
     analyzer = WeeklyAnalyzer(df)
     return analyzer.analyze()
+
+def get_weekly_samples_for_ai(df: pd.DataFrame, max_per_week: int = 1000) -> List[Dict[str, Any]]:
+    """
+    便捷函数：获取周度消息样本。
+    """
+    analyzer = WeeklyAnalyzer(df)
+    return analyzer.get_weekly_samples(max_per_week)

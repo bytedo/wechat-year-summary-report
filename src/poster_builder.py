@@ -64,13 +64,48 @@ class PosterBuilder:
         # 提取年份
         year = df['timestamp'].dt.year.mode().iloc[0] if not df.empty else datetime.now().year
         
-        # 使用 AI 生成话题回忆
+        # 使用 AI 生成话题回忆 AI 分析
         topic_memories = []
-        if use_ai and monthly_data:
-            print("   🧠 正在生成话题回忆...")
+        user_profiles_mbti = []
+        weekly_ai_summary = ""
+        golden_quotes = []  # 初始化，防止 use_ai=False 时 NameError
+        
+        if use_ai:
+            print("   🧠 正在调用 AI 进行深度分析...")
             ai_analyzer = AIAnalyzer()
-            topic_memories = ai_analyzer.generate_topic_memories(monthly_data)
-            print(f"   ✓ 已生成 {len(topic_memories)} 个月的话题回忆")
+            
+            # 1. 生成周度深度总结 & 获取周结构化数据
+            print("   📊 1/3 正在进行周度全量扫描...")
+            from .analyzers.weekly_analyzer import get_weekly_samples_for_ai
+            weekly_samples = get_weekly_samples_for_ai(df, max_per_week=1000)
+            weekly_ai_summary, weekly_summaries_dict = ai_analyzer.analyze_weekly_batches(weekly_samples)
+            print("   ✓ 周度深度总结已生成")
+            
+            # 2. 基于周报生成月度话题回忆 (更精准)
+            if monthly_data:
+                print("   📅 2/3 正在生成月度话题回忆 (基于周报)...")
+                if weekly_summaries_dict:
+                    topic_memories = ai_analyzer.generate_monthly_summary_from_weekly(monthly_data, weekly_summaries_dict)
+                else:
+                    topic_memories = ai_analyzer.generate_topic_memories(monthly_data)
+                print(f"   ✓ 已生成 {len(topic_memories)} 个月的话题回忆")
+            
+            # 3. 生成用户画像及 MBTI
+            print("   👥 3/3 正在生成用户画像...")
+            # 获取最活跃的前 10 位用户
+            top_users = [u['user'] for u in yearly_data.get('rankings', {}).get('top_talkers', [])[:10]]
+            if top_users:
+                user_profiles_mbti = ai_analyzer.generate_user_profiles_with_mbti(df, top_users)
+                print(f"   ✓ 已生成 {len(user_profiles_mbti)} 位用户的 MBTI 画像")
+                
+            # 4. 生成年度金句
+            print("   💬 4/4 正在挖掘年度金句...")
+            quote_candidates = yearly_data.get('quote_candidates', [])
+            if quote_candidates:
+                golden_quotes = ai_analyzer.select_golden_quotes(quote_candidates)
+                print(f"   ✓ 已挖掘 {len(golden_quotes)} 条金句")
+            else:
+                print("   ⚠️ 未找到足够的候选消息用于挖掘金句")
         
         # 构建上下文
         context = {
@@ -88,12 +123,15 @@ class PosterBuilder:
             'fun_facts': yearly_data.get('fun_facts', []),
             'user_profiles': yearly_data.get('user_profiles', []),
             
-            # 月度数据（含话题回忆）
+            # AI 分析数据
             'monthly_data': monthly_data,
             'topic_memories': topic_memories,
+            'user_profiles_mbti': user_profiles_mbti,
+            'weekly_ai_summary': weekly_ai_summary,
+            'golden_quotes': golden_quotes,
             
-            # 金句
-            'golden_quotes': memories_data.get('golden_quotes', []) if memories_data else [],
+            # 图表数据
+            'charts': yearly_data.get('charts', {}),
             
             # 背景音乐
             'music_url': music_url,

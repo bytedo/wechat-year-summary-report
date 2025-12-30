@@ -11,11 +11,25 @@
     <!-- TailwindCSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Swiper -->
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css"
-    />
+    <!-- ECharts -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+  </head>
+  <body>
+    <!-- Data Injection for Charts -->
+    <script id="chart-data-hourly" type="application/json">
+      {{ charts.hourly | tojson if charts.hourly else '[]' }}
+    </script>
+    <script id="chart-data-monthly" type="application/json">
+      {{ charts.monthly | tojson if charts.monthly else '[]' }}
+    </script>
+
+    <!-- ... (rest of body) ... -->
+    
+    <!-- ... (rest of body) ... -->
+    
+    <!-- Scripts at bottom -->
+
+    <!-- Google Fonts -->
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -26,8 +40,18 @@
     />
 
     <style>
+      :root {
+        --wc-green: #07c160;
+        --wc-bg: #ededed;
+        --wc-card-bg: #ffffff;
+        --wc-text-primary: #191919;
+        --wc-text-secondary: #b2b2b2;
+        --wc-text-desc: #576b95; /* Link color/Desc color often used in WeChat */
+      }
+
       * {
-        font-family: "Noto Sans SC", sans-serif;
+        font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        -webkit-tap-highlight-color: transparent;
       }
 
       html,
@@ -35,7 +59,8 @@
         margin: 0;
         padding: 0;
         overflow: hidden;
-        background: #0f0f1a;
+        background-color: var(--wc-bg);
+        color: var(--wc-text-primary);
       }
 
       .swiper {
@@ -48,195 +73,43 @@
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        padding: 20px;
+        padding: 24px;
         box-sizing: border-box;
         overflow: hidden;
         position: relative;
+        background-color: var(--wc-bg); /* Global Background */
       }
 
-      /* 渐变背景 */
-      .bg-gradient-cover {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      }
-
-      .bg-gradient-stats {
-        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-      }
-
-      .bg-gradient-users {
-        background: linear-gradient(135deg, #fc466b 0%, #3f5efb 100%);
-      }
-
-      .bg-gradient-month {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-      }
-
-      .bg-gradient-quotes {
-        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-      }
-
-      .bg-gradient-end {
-        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-      }
-
-      /* SVG 背景图案 */
-      .pattern-dots {
-        background-image: radial-gradient(rgba(255,255,255,0.1) 1px, transparent 1px);
-        background-size: 20px 20px;
-      }
-
-      .pattern-grid {
-        background-image: 
-          linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
-        background-size: 30px 30px;
-      }
-
-      .pattern-circles {
-        background-image: radial-gradient(circle at 20% 80%, rgba(255,255,255,0.1) 0%, transparent 50%),
-                          radial-gradient(circle at 80% 20%, rgba(255,255,255,0.08) 0%, transparent 40%),
-                          radial-gradient(circle at 50% 50%, rgba(255,255,255,0.05) 0%, transparent 60%);
-      }
-
-      /* 浮动装饰元素 */
-      .floating-shapes {
-        position: absolute;
-        top: 0;
-        left: 0;
+      /* WeChat Style Card */
+      .wechat-card {
+        background: var(--wc-card-bg);
+        border-radius: 8px; /* Classic WeChat rounded corners */
+        padding: 24px;
         width: 100%;
-        height: 100%;
-        overflow: hidden;
-        z-index: 0;
-        pointer-events: none;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        margin-bottom: 16px;
+        position: relative;
       }
 
-      .shape {
-        position: absolute;
-        border-radius: 50%;
-        opacity: 0.1;
-        animation: floatShape 8s ease-in-out infinite;
+      /* Typography Utilities */
+      .text-wc-primary {
+        color: var(--wc-text-primary);
+      }
+      .text-wc-secondary {
+        color: #888888;
+      }
+      .text-wc-green {
+        color: var(--wc-green);
+      }
+      .text-wc-desc {
+        color: var(--wc-text-desc);
       }
 
-      .shape-1 {
-        width: 100px;
-        height: 100px;
-        background: linear-gradient(45deg, #fff, transparent);
-        top: 10%;
-        left: 10%;
-        animation-delay: 0s;
-      }
-
-      .shape-2 {
-        width: 60px;
-        height: 60px;
-        background: linear-gradient(135deg, #fff, transparent);
-        top: 70%;
-        right: 15%;
-        animation-delay: 2s;
-      }
-
-      .shape-3 {
-        width: 80px;
-        height: 80px;
-        background: linear-gradient(225deg, #fff, transparent);
-        bottom: 20%;
-        left: 20%;
-        animation-delay: 4s;
-      }
-
-      .shape-4 {
-        width: 40px;
-        height: 40px;
-        background: #fff;
-        top: 40%;
-        right: 10%;
-        animation-delay: 1s;
-      }
-
-      @keyframes floatShape {
-        0%, 100% {
-          transform: translateY(0) rotate(0deg);
-        }
-        50% {
-          transform: translateY(-20px) rotate(180deg);
-        }
-      }
-
-      /* 波浪背景 */
-      .wave-container {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: 150px;
-        overflow: hidden;
-        z-index: 0;
-      }
-
-      .wave {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 200%;
-        height: 100%;
-        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='rgba(255,255,255,0.1)' d='M0,192L48,176C96,160,192,128,288,133.3C384,139,480,181,576,181.3C672,181,768,139,864,128C960,117,1056,139,1152,154.7C1248,171,1344,181,1392,186.7L1440,192L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E");
-        background-size: 50% 100%;
-        animation: wave 10s linear infinite;
-      }
-
-      .wave:nth-child(2) {
-        bottom: 10px;
-        opacity: 0.5;
-        animation-delay: -5s;
-        animation-duration: 15s;
-      }
-
-      @keyframes wave {
-        0% { transform: translateX(0); }
-        100% { transform: translateX(-50%); }
-      }
-
-      /* 发光效果 */
-      .glow-soft {
-        box-shadow: 0 0 40px rgba(255,255,255,0.1);
-      }
-
-      /* 装饰线条 */
-      .decorative-line {
-        width: 60px;
-        height: 3px;
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
-        margin: 15px auto;
-        border-radius: 2px;
-      }
-
-      /* 气泡动画 */
-      .bubble {
-        position: absolute;
-        background: rgba(255,255,255,0.1);
-        border-radius: 50%;
-        animation: rise 6s ease-in-out infinite;
-      }
-
-      @keyframes rise {
-        0% {
-          transform: translateY(100vh) scale(0);
-          opacity: 0;
-        }
-        50% {
-          opacity: 0.3;
-        }
-        100% {
-          transform: translateY(-100vh) scale(1);
-          opacity: 0;
-        }
-      }
-
-      /* 动画 */
+      /* Animations */
       @keyframes fadeInUp {
         from {
           opacity: 0;
-          transform: translateY(30px);
+          transform: translateY(20px);
         }
         to {
           opacity: 1;
@@ -244,10 +117,10 @@
         }
       }
 
-      @keyframes fadeInScale {
+      @keyframes scaleIn {
         from {
           opacity: 0;
-          transform: scale(0.8);
+          transform: scale(0.9);
         }
         to {
           opacity: 1;
@@ -255,173 +128,146 @@
         }
       }
 
-      @keyframes pulse {
-        0%,
-        100% {
-          transform: scale(1);
-        }
-        50% {
-          transform: scale(1.05);
-        }
+      .animate-enter {
+        animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        opacity: 0;
+      }
+      
+      .animate-scale {
+        animation: scaleIn 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        opacity: 0;
       }
 
-      @keyframes float {
-        0%,
-        100% {
-          transform: translateY(0);
-        }
-        50% {
-          transform: translateY(-10px);
-        }
-      }
+      .delay-100 { animation-delay: 0.1s; }
+      .delay-200 { animation-delay: 0.2s; }
+      .delay-300 { animation-delay: 0.3s; }
+      .delay-400 { animation-delay: 0.4s; }
+      .delay-500 { animation-delay: 0.5s; }
 
-      @keyframes countUp {
-        from {
-          opacity: 0;
-        }
-        to {
-          opacity: 1;
-        }
-      }
-
-      .animate-fade-in-up {
-        animation: fadeInUp 0.8s ease-out forwards;
-      }
-
-      .animate-fade-in-scale {
-        animation: fadeInScale 0.6s ease-out forwards;
-      }
-
-      .animate-pulse-slow {
-        animation: pulse 3s ease-in-out infinite;
-      }
-
-      .animate-float {
-        animation: float 4s ease-in-out infinite;
-      }
-
-      .delay-100 {
-        animation-delay: 0.1s;
-      }
-      .delay-200 {
-        animation-delay: 0.2s;
-      }
-      .delay-300 {
-        animation-delay: 0.3s;
-      }
-      .delay-400 {
-        animation-delay: 0.4s;
-      }
-      .delay-500 {
-        animation-delay: 0.5s;
-      }
-
-      /* 数字滚动 */
-      .number-roll {
-        display: inline-block;
-        transition: all 0.5s ease-out;
-      }
-
-      /* 粒子背景 */
-      .particles {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-        z-index: 0;
-      }
-
-      .particle {
-        position: absolute;
-        width: 4px;
-        height: 4px;
-        background: rgba(255, 255, 255, 0.5);
-        border-radius: 50%;
-        animation: float 6s ease-in-out infinite;
-      }
-
-      /* 卡片样式 */
-      .glass-card {
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        border-radius: 16px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-      }
-
-      /* 音频控制 */
+      /* Audio Control */
       .audio-control {
         position: fixed;
-        bottom: 20px;
+        top: 20px;
         right: 20px;
         z-index: 100;
-        width: 50px;
-        height: 50px;
+        width: 36px;
+        height: 36px;
         border-radius: 50%;
-        background: rgba(255, 255, 255, 0.2);
-        backdrop-filter: blur(10px);
+        background: rgba(0, 0, 0, 0.1);
         display: flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
         transition: all 0.3s ease;
+        border: 1px solid rgba(255,255,255,0.5);
+      }
+      
+      .audio-control.playing {
+        background: var(--wc-green);
+        animation: spin 4s linear infinite;
+        border: none;
       }
 
-      .audio-control:hover {
-        background: rgba(255, 255, 255, 0.3);
-        transform: scale(1.1);
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
       }
 
-      .audio-control.playing .music-icon {
-        animation: pulse 1s ease-in-out infinite;
+      /* Specific Components */
+      .avatar-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 4px; /* WeChat avatars are slightly rounded squares usually, but circles are fine for design */
+        background: #e0e0e0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: #fff;
+        font-size: 16px;
       }
 
-      /* 进度指示器 */
+      .progress-bar-bg {
+        background-color: #f0f0f0;
+        border-radius: 10px;
+        height: 6px;
+        overflow: hidden;
+      }
+      
+      .progress-bar-fill {
+        background-color: var(--wc-green);
+        height: 100%;
+        border-radius: 10px;
+      }
+      
+      .chat-bubble {
+        background: #95ec69; /* WeChat sender bubble green */
+        color: #000;
+        padding: 10px 14px;
+        border-radius: 6px;
+        position: relative;
+        display: inline-block;
+      }
+      
+      .chat-bubble-white {
+        background: #ffffff;
+        color: #000;
+        padding: 10px 14px;
+        border-radius: 6px;
+        display: inline-block;
+        border: 1px solid #f0f0f0;
+      }
+
+      /* Swiper Pagination */
       .swiper-pagination-bullet {
-        background: rgba(255, 255, 255, 0.5);
+        background: #ccc;
         opacity: 1;
       }
-
       .swiper-pagination-bullet-active {
-        background: #fff;
-        transform: scale(1.2);
+        background: var(--wc-green);
       }
-
-      /* 滑动提示 */
+      
+      /* Slide Bottom Hint */
       .swipe-hint {
         position: absolute;
-        bottom: 30px;
+        bottom: 24px;
         left: 50%;
         transform: translateX(-50%);
-        color: rgba(255, 255, 255, 0.6);
-        font-size: 14px;
-        animation: fadeInUp 1s ease-out, float 2s ease-in-out infinite;
-        animation-delay: 2s, 3s;
-        opacity: 0;
-        animation-fill-mode: forwards, none;
+        color: var(--wc-text-secondary);
+        font-size: 12px;
+        animation: bounce 2s infinite;
+        opacity: 0.6;
+      }
+      
+       @keyframes bounce {
+        0%, 20%, 50%, 80%, 100% {transform: translateX(-50%) translateY(0);}
+        40% {transform: translateX(-50%) translateY(-6px);}
+        60% {transform: translateX(-50%) translateY(-3px);}
       }
 
-      /* 响应式 */
-      @media (max-width: 640px) {
-        .text-6xl {
-          font-size: 2.5rem;
-        }
-        .text-5xl {
-          font-size: 2rem;
-        }
-        .text-4xl {
-          font-size: 1.75rem;
-        }
-        .text-3xl {
-          font-size: 1.5rem;
-        }
+      /* Layout helpers */
+      .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      /* Decorative */
+      .wechat-icon {
+        width: 64px;
+        height: 64px;
+        background: var(--wc-green);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 24px;
+        box-shadow: 0 4px 12px rgba(7, 193, 96, 0.3);
       }
     </style>
   </head>
   <body>
-    <!-- 背景音乐 -->
+    <!-- Background Music -->
     <audio id="bgMusic" loop preload="auto">
       <source
         src="{{ music_url | default('https://music.163.com/song/media/outer/url?id=1901371647.mp3') }}"
@@ -429,399 +275,443 @@
       />
     </audio>
 
-    <!-- 音频控制按钮 -->
     <div class="audio-control" id="audioControl" onclick="toggleMusic()">
-      <span class="music-icon text-white text-xl">🎵</span>
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" />
+      </svg>
     </div>
 
-    <!-- Swiper 容器 -->
     <div class="swiper">
       <div class="swiper-wrapper">
-        <!-- 封面页 -->
-        <div class="swiper-slide bg-gradient-cover pattern-dots">
-          <div class="particles" id="particles-cover"></div>
-          <!-- 浮动装饰 -->
-          <div class="floating-shapes">
-            <div class="shape shape-1"></div>
-            <div class="shape shape-2"></div>
-            <div class="shape shape-3"></div>
-            <div class="shape shape-4"></div>
-          </div>
-          <!-- 波浪背景 -->
-          <div class="wave-container">
-            <div class="wave"></div>
-            <div class="wave"></div>
-          </div>
-          <div class="text-center z-10">
-            <div class="text-6xl mb-6 animate-fade-in-scale">🎉</div>
-            <h1 class="text-5xl font-black text-white mb-4 animate-fade-in-up glow-soft">
+        
+        <!-- COVER PAGE -->
+        <div class="swiper-slide">
+          <div class="text-center w-full max-w-md">
+            <div class="wechat-icon animate-scale">
+               <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.172 6.17a1.001 1.001 0 10-1.414 1.414l2.828 2.829a1 1 0 001.414 0l8.486-8.485a1 1 0 10-1.414-1.414l-7.779 7.778-2.12-2.12z" />
+              </svg>
+            </div>
+            
+            <h1 class="text-3xl font-bold text-wc-primary mb-2 animate-enter delay-100">
               {{ group_name }}
             </h1>
-            <div class="decorative-line animate-fade-in-up delay-100"></div>
-            <p class="text-2xl text-white/80 mb-8 animate-fade-in-up delay-200">
-              {{ year }} 年度回忆录
+            <p class="text-xl text-wc-secondary mb-8 animate-enter delay-200">
+              {{ year }} 年度数据报告
             </p>
-            <div class="glass-card px-8 py-4 animate-fade-in-up delay-300">
-              <p class="text-white/90 text-lg">{{ date_range }}</p>
+            
+            <div class="wechat-card animate-enter delay-300">
+              <div class="flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
+                 <span class="text-gray-500 text-sm">统计时间</span>
+                 <span class="text-wc-primary font-medium text-sm">{{ date_range.split(' ')[0] }} 起</span>
+              </div>
+               <div class="flex items-center justify-between">
+                 <span class="text-gray-500 text-sm">生成时间</span>
+                 <span class="text-wc-primary font-medium text-sm">{{ date_range.split(' ')[-1] if ' ' in date_range else date_range }}</span>
+              </div>
             </div>
+            
+             <p class="text-gray-400 text-xs mt-12 animate-enter delay-400">
+              下滑开启回忆 &darr;
+            </p>
           </div>
-          <div class="swipe-hint">👆 向上滑动开始回忆</div>
         </div>
 
-        <!-- 数据总览页 -->
-        <div class="swiper-slide bg-gradient-stats pattern-grid">
-          <div class="text-center z-10 w-full max-w-md">
-            <h2 class="text-3xl font-bold text-white mb-8 animate-fade-in-up">
-              📊 这一年，我们...
-            </h2>
-
-            <div class="space-y-6">
-              <div class="glass-card p-6 animate-fade-in-up delay-100">
-                <div
-                  class="text-5xl font-black text-white mb-2"
-                  data-count="{{ overview.total_messages }}"
-                >
-                  0
-                </div>
-                <div class="text-white/80">条消息</div>
+        <!-- STATS OVERVIEW -->
+        <div class="swiper-slide">
+          <div class="w-full max-w-md">
+            <h2 class="text-2xl font-bold text-wc-primary mb-6 animate-enter">这一年</h2>
+            
+            <div class="wechat-card animate-enter delay-100 p-8 text-center">
+              <div class="text-sm text-gray-500 mb-2">共产生了</div>
+              <div class="text-5xl font-bold text-wc-green" data-count="{{ overview.total_messages }}">0</div>
+              <div class="text-sm text-gray-500 mt-2">条消息</div>
+            </div>
+            
+            <div class="stats-grid animate-enter delay-200">
+              <div class="wechat-card text-center">
+                <div class="text-2xl font-bold text-wc-primary mb-1" data-count="{{ overview.total_users }}">0</div>
+                <div class="text-xs text-gray-500">位群友参与</div>
               </div>
-
-              <div class="grid grid-cols-2 gap-4">
-                <div class="glass-card p-4 animate-fade-in-up delay-200">
-                  <div
-                    class="text-3xl font-bold text-white mb-1"
-                    data-count="{{ overview.total_users }}"
-                  >
-                    0
-                  </div>
-                  <div class="text-white/70 text-sm">位群友</div>
-                </div>
-                <div class="glass-card p-4 animate-fade-in-up delay-300">
-                  <div
-                    class="text-3xl font-bold text-white mb-1"
-                    data-count="{{ overview.active_days }}"
-                  >
-                    0
-                  </div>
-                  <div class="text-white/70 text-sm">活跃天数</div>
-                </div>
+              <div class="wechat-card text-center">
+                <div class="text-2xl font-bold text-wc-primary mb-1" data-count="{{ overview.total_days }}">0</div>
+                <div class="text-xs text-gray-500">天热闹非凡</div>
               </div>
-
-              <div class="glass-card p-4 animate-fade-in-up delay-400">
-                <div class="text-lg text-white/90">
-                  平均每天
-                  <span class="text-2xl font-bold text-yellow-300"
-                    >{{ overview.avg_per_day }}</span
-                  >
-                  条消息
-                </div>
-              </div>
+            </div>
+            
+            <div class="wechat-card animate-enter delay-300 flex items-center justify-between">
+                <span class="text-gray-600">日均消息</span>
+                 <span class="text-xl font-bold text-wc-green">{{ overview.avg_per_day }} 条</span>
             </div>
           </div>
         </div>
 
-        <!-- 年度人物榜 -->
-        <div class="swiper-slide bg-gradient-users">
-          <div class="text-center z-10 w-full max-w-md">
-            <h2 class="text-3xl font-bold text-white mb-6 animate-fade-in-up">
-              👑 年度话痨榜
-            </h2>
-
-            <div class="space-y-3">
-              {% for user in rankings.top_talkers[:5] %}
-              <div
-                class="glass-card p-4 flex items-center animate-fade-in-up delay-{{ loop.index }}00"
-              >
-                <div
-                  class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-bold mr-4"
-                >
-                  {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif
-                  loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}
-                </div>
-                <div class="flex-1 text-left">
-                  <div class="text-white font-medium">{{ user.user }}</div>
-                  <div class="text-white/60 text-sm">
-                    {{ user.count }} 条 · {{ user.percentage }}%
+        <!-- TOP TALKERS (RANKING) -->
+        <div class="swiper-slide">
+           <div class="w-full max-w-md h-full flex flex-col justify-center">
+             <h2 class="text-2xl font-bold text-wc-primary mb-6 animate-enter">活跃榜单</h2>
+             
+             <div class="wechat-card animate-enter delay-100 p-0 overflow-hidden">
+               <!-- Header -->
+               <div class="bg-gray-50 px-5 py-3 border-b border-gray-100 flex justify-between text-xs text-gray-500">
+                 <span>排名 / 用户</span>
+                 <span>发言数</span>
+               </div>
+               
+               <div class="divide-y divide-gray-100">
+                  {% for user in rankings.top_talkers[:6] %}
+                  <div class="flex items-center px-5 py-4">
+                    <div class="w-6 text-center text-sm font-bold text-gray-400 mr-4">
+                      {% if loop.index <= 3 %}
+                        <span class="text-yellow-500 text-lg">
+                           {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% else %}🥉{% endif %}
+                        </span>
+                      {% else %}
+                        {{ loop.index }}
+                      {% endif %}
+                    </div>
+                    
+                    <div class="flex-1">
+                      <div class="text-wc-primary font-medium text-sm truncate w-32">{{ user.user }}</div>
+                      <div class="w-full bg-gray-100 rounded-full h-1.5 mt-2 overflow-hidden">
+                        <div class="bg-green-500 h-1.5 rounded-full" data-width="{{ user.percentage * 2 }}%" style="width: 0%"></div>
+                      </div>
+                    </div>
+                    
+                    <div class="text-right pl-4">
+                       <div class="text-wc-green font-bold text-sm">{{ user.count }}</div>
+                       <div class="text-gray-300 text-xs">{{ user.percentage }}%</div>
+                    </div>
                   </div>
-                </div>
-                <div class="w-20 bg-white/20 rounded-full h-2">
-                  <div
-                    class="bg-yellow-400 h-2 rounded-full"
-                    style="width: {{ user.percentage * 2 }}%"
-                  ></div>
-                </div>
-              </div>
-              {% endfor %}
-            </div>
-          </div>
+                  {% endfor %}
+               </div>
+             </div>
+           </div>
         </div>
 
-        <!-- 月度回顾页（每月一页） -->
+        <!-- MONTHLY DATA (LOOP) -->
         {% for month in monthly_data %}
-        <div
-          class="swiper-slide bg-gradient-month"
-          style="background: linear-gradient(135deg, hsl({{ (month.month_num - 1) * 30 }}, 70%, 50%) 0%, hsl({{ (month.month_num - 1) * 30 + 30 }}, 70%, 60%) 100%);"
-        >
-          <div class="text-center z-10 w-full max-w-md">
-            <div class="text-5xl mb-3 animate-fade-in-scale">📅</div>
-            <h2 class="text-3xl font-black text-white mb-4 animate-fade-in-up">
-              {{ month.month_name }}
-            </h2>
-
-            <!-- 数据统计 -->
-            <div class="glass-card p-4 mb-3 animate-fade-in-up delay-100">
-              <div class="grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <div class="text-xl font-bold text-white">{{ month.stats.total_messages }}</div>
-                  <div class="text-white/60 text-xs">条消息</div>
+        <div class="swiper-slide">
+           <div class="w-full max-w-md relative">
+             <div class="absolute -top-16 right-0 text-6xl font-black text-gray-100 z-0 pointer-events-none select-none">
+               {{ month.month_num }}
+             </div>
+             
+             <h2 class="text-2xl font-bold text-wc-primary mb-1 animate-enter relative z-10">{{ month.month_name }}</h2>
+             <p class="text-sm text-gray-400 mb-6 animate-enter delay-100 relative z-10">这一月的独家记忆</p>
+             
+             <!-- Stats Row -->
+             <div class="grid grid-cols-3 gap-3 mb-4 animate-enter delay-200 relative z-10">
+               <div class="bg-white rounded-lg p-3 text-center shadow-sm">
+                 <div class="text-wc-green font-bold text-lg">{{ month.stats.total_messages }}</div>
+                 <div class="text-xs text-gray-400">条消息</div>
+               </div>
+               <div class="bg-white rounded-lg p-3 text-center shadow-sm">
+                 <div class="text-gray-800 font-bold text-lg">{{ month.stats.active_users }}</div>
+                 <div class="text-xs text-gray-400">人参与</div>
+               </div>
+               <div class="bg-white rounded-lg p-3 text-center shadow-sm">
+                 <div class="text-gray-800 font-bold text-lg">{{ month.stats.active_days }}</div>
+                 <div class="text-xs text-gray-400">天活跃</div>
+               </div>
+             </div>
+             
+             <!-- AI Memory -->
+             {% set memory = topic_memories | selectattr('month_key', 'equalto', month.month) | first %}
+             {% if memory %}
+               <div class="wechat-card animate-enter delay-300 relative z-10">
+                 
+                 {% if memory.topics %}
+                 <div class="mb-4">
+                    <div class="text-xs text-gray-400 mb-2">📌 热聊话题</div>
+                    <div class="flex flex-wrap gap-2">
+                       {% for topic in memory.topics[:3] %}
+                       <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs"># {{ topic.title }}</span>
+                       {% endfor %}
+                    </div>
+                 </div>
+                 {% endif %}
+                 
+                 {% if memory.memory %}
+                 <div class="bg-gray-50 p-3 rounded text-sm text-gray-600 leading-relaxed border-l-4 border-green-500">
+                   {{ memory.memory }}
+                 </div>
+                 {% endif %}
+               </div>
+             {% endif %}
+             
+             <!-- Highlights -->
+             <div class="grid grid-cols-2 gap-3 animate-enter delay-400 relative z-10">
+                {% if month.highlights.monthly_star %}
+                <div class="bg-white p-3 rounded-lg shadow-sm flex items-center">
+                   <div class="w-8 h-8 rounded bg-yellow-100 text-yellow-600 flex items-center justify-center mr-2 text-xs font-bold">★</div>
+                   <div class="overflow-hidden">
+                      <div class="text-xs text-gray-400">月度之星</div>
+                      <div class="text-sm font-bold truncate">{{ month.highlights.monthly_star.user }}</div>
+                   </div>
                 </div>
-                <div>
-                  <div class="text-xl font-bold text-white">{{ month.stats.active_users }}</div>
-                  <div class="text-white/60 text-xs">人活跃</div>
+                {% endif %}
+                
+                 {% if month.highlights.busiest_day %}
+                <div class="bg-white p-3 rounded-lg shadow-sm flex items-center">
+                   <div class="w-8 h-8 rounded bg-red-100 text-red-600 flex items-center justify-center mr-2 text-xs font-bold">🔥</div>
+                   <div class="overflow-hidden">
+                      <div class="text-xs text-gray-400">最热一天</div>
+                      <div class="text-sm font-bold truncate">{{ month.highlights.busiest_day.date[-5:] }}</div>
+                   </div>
                 </div>
-                <div>
-                  <div class="text-xl font-bold text-white">{{ month.stats.active_days }}</div>
-                  <div class="text-white/60 text-xs">天有聊</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 话题回忆（AI生成的描述） -->
-            {% set memory = topic_memories | selectattr('month_key', 'equalto', month.month) | first %}
-            {% if memory %}
-            
-            <!-- AI 提取的具体话题 -->
-            {% if memory.topics %}
-            <div class="glass-card p-3 mb-3 animate-fade-in-up delay-200">
-              <div class="text-white/60 text-xs mb-2">📌 本月热聊</div>
-              <div class="space-y-2">
-                {% for topic in memory.topics[:3] %}
-                <div class="flex items-start text-left">
-                  <span class="text-yellow-300 mr-2">•</span>
-                  <div>
-                    <span class="text-white text-sm font-medium">{{ topic.title }}</span>
-                    {% if topic.desc %}
-                    <span class="text-white/50 text-xs ml-1">{{ topic.desc }}</span>
-                    {% endif %}
-                  </div>
-                </div>
-                {% endfor %}
-              </div>
-            </div>
-            {% endif %}
-            
-            <!-- 话题回忆描述 -->
-            {% if memory.memory %}
-            <div class="glass-card p-3 mb-3 animate-fade-in-up delay-250">
-              <p class="text-white/80 text-xs leading-relaxed text-left italic">{{ memory.memory }}</p>
-            </div>
-            {% endif %}
-            {% endif %}
-
-            <!-- 月度之星和最活跃日 -->
-            <div class="grid grid-cols-2 gap-2 animate-fade-in-up delay-300">
-              {% if month.highlights.monthly_star %}
-              <div class="glass-card p-3">
-                <div class="text-white/60 text-xs mb-1">🏆 月度之星</div>
-                <div class="text-white font-bold text-sm truncate">{{ month.highlights.monthly_star.user }}</div>
-                <div class="text-yellow-300 text-xs">{{ month.highlights.monthly_star.count }}条</div>
-              </div>
-              {% endif %}
-              {% if month.highlights.busiest_day %}
-              <div class="glass-card p-3">
-                <div class="text-white/60 text-xs mb-1">🔥 最热一天</div>
-                <div class="text-white font-bold text-sm">{{ month.highlights.busiest_day.date[-5:] }}</div>
-                <div class="text-yellow-300 text-xs">{{ month.highlights.busiest_day.count }}条</div>
-              </div>
-              {% endif %}
-            </div>
-          </div>
+                {% endif %}
+             </div>
+             
+           </div>
         </div>
         {% endfor %}
 
-        <!-- 年度金句页 -->
-        <div class="swiper-slide bg-gradient-quotes">
-          <div class="text-center z-10 w-full max-w-md overflow-y-auto" style="max-height: 90vh;">
-            <h2 class="text-3xl font-bold text-white mb-6 animate-fade-in-up">
-              💬 年度金句
-            </h2>
+        <!-- GOLDEN QUOTES -->
+        <div class="swiper-slide text-left items-start overflow-hidden">
+           <div class="w-full max-w-md mx-auto h-full flex flex-col pt-12 pb-12">
+              <h2 class="text-2xl font-bold text-wc-primary mb-6 animate-enter px-2">名场面</h2>
+              
+              <div class="overflow-y-auto pr-2 space-y-5 flex-1" style="scrollbar-width: none;">
+                 {% for quote in golden_quotes %}
+                 {% set delay = loop.index * 0.1 %}
+                 <div class="animate-enter" data-delay="{{ delay }}s">
+                    <div class="flex items-start mb-1">
+                       <div class="w-8 h-8 rounded bg-gray-200 flex items-center justify-center text-gray-500 text-xs font-bold mr-2 flex-shrink-0">
+                         {{ quote.user[:1] }}
+                       </div>
+                       <div>
+                          <div class="text-xs text-gray-400 mb-1 flex items-center gap-2">
+                            {{ quote.user }}
+                            {% if quote.category %}
+                              <span class="bg-gray-100 text-gray-400 px-1 rounded text-[10px]">{{ quote.category }}</span>
+                            {% endif %}
+                          </div>
+                          <!-- Use green bubble for "me" style or just white bubble for general -->
+                          <div class="bg-white p-3 rounded-tr-lg rounded-bl-lg rounded-br-lg shadow-sm text-sm text-gray-800 leading-relaxed border border-gray-100 relative">
+                             {{ quote.content }}
+                          </div>
+                          {% if quote.reason %}
+                          <div class="text-[10px] text-gray-400 mt-1 ml-1 pl-2 border-l-2 border-gray-200">{{ quote.reason }}</div>
+                          {% endif %}
+                       </div>
+                    </div>
+                 </div>
+                 {% endfor %}
+                 
+                 <!-- Footer Spacing -->
+                 <div class="h-10"></div>
+              </div>
+           </div>
+        </div>
 
-            <div class="space-y-3">
-              {% for quote in golden_quotes %}
-              <div
-                class="glass-card p-4 text-left animate-fade-in-up"
-                style="animation-delay: {{ loop.index * 0.1 }}s;"
-              >
-                <div class="flex items-start gap-2 mb-2">
-                  {% if quote.category %}
-                  <span class="text-sm">
-                    {% if '搞笑' in quote.category %}😂{% elif '金玉' in quote.category %}💡{% elif '名场面' in quote.category %}🔥{% elif '暖心' in quote.category %}💖{% elif '神回复' in quote.category %}🎭{% else %}💬{% endif %}
-                  </span>
-                  {% endif %}
-                  <div class="text-white text-base">"{{ quote.content }}"</div>
+        <!-- FUN FACTS -->
+        <div class="swiper-slide">
+           <div class="w-full max-w-md">
+              <h2 class="text-2xl font-bold text-wc-primary mb-6 animate-enter">数据趣闻</h2>
+              
+              <div class="space-y-4">
+                {% for fact in fun_facts[:4] %}
+                <div class="wechat-card flex items-center p-4 animate-enter" data-delay="{{ loop.index * 0.1 }}s">
+                   <div class="text-3xl mr-4 bg-gray-100 w-12 h-12 rounded-full flex items-center justify-center">{{ fact.icon }}</div>
+                   <div class="flex-1">
+                      <div class="text-sm text-gray-500">{{ fact.title }}</div>
+                      <div class="text-lg font-bold text-wc-primary">
+                        {{ fact.value }} <span class="text-sm font-normal">{{ fact.unit }}</span>
+                      </div>
+                      <div class="text-xs text-gray-400 mt-1">{{ fact.description }}</div>
+                   </div>
                 </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-yellow-300 font-medium text-sm"
-                    >—— {{ quote.user }}</span
-                  >
-                  <span class="text-white/50 text-xs">{{ quote.reason }}</span>
+                {% endfor %}
+              </div>
+           </div>
+        </div>
+
+        <!-- SPECIAL AWARDS (Eagle/Night Owl) -->
+        <div class="swiper-slide">
+          <div class="w-full max-w-md">
+             <h2 class="text-2xl font-bold text-wc-primary mb-6 animate-enter">特别奖项</h2>
+             
+             <div class="grid gap-4">
+                <!-- Early Bird -->
+                {% if highlights.early_bird and highlights.early_bird.user %}
+                <div class="wechat-card animate-enter delay-100 bg-gradient-to-br from-white to-orange-50">
+                   <div class="flex items-center mb-3">
+                      <span class="text-2xl mr-2">☀️</span>
+                      <span class="font-bold text-gray-800">早起鸟</span>
+                   </div>
+                   <div class="flex items-baseline mb-1">
+                      <span class="text-xl font-bold text-wc-green mr-2">{{ highlights.early_bird.user }}</span>
+                      <span class="text-xs text-gray-500">{{ highlights.early_bird.days }}次首发</span>
+                   </div>
+                   <p class="text-xs text-gray-400">总是第一个叫醒群友的人</p>
                 </div>
-              </div>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-
-        <!-- 年度之最页 -->
-        <div class="swiper-slide bg-gradient-to-br from-purple-600 to-pink-500">
-          <div class="text-center z-10 w-full max-w-md">
-            <h2 class="text-3xl font-bold text-white mb-6 animate-fade-in-up">
-              🏆 年度之最
-            </h2>
-
-            <div class="space-y-4">
-              {% for fact in fun_facts %}
-              <div
-                class="glass-card p-4 flex items-center animate-fade-in-up delay-{{ loop.index }}00"
-              >
-                <div class="text-3xl mr-4">{{ fact.icon }}</div>
-                <div class="text-left flex-1">
-                  <div class="text-white/70 text-sm">{{ fact.title }}</div>
-                  <div class="text-white font-bold text-xl">
-                    {{ fact.value }} {{ fact.unit }}
-                  </div>
-                  <div class="text-white/60 text-xs">
-                    {{ fact.description }}
-                  </div>
+                {% endif %}
+                
+                <!-- Night Owl -->
+                {% if highlights.night_owl and highlights.night_owl.user %}
+                <div class="wechat-card animate-enter delay-200 bg-gradient-to-br from-white to-indigo-50">
+                   <div class="flex items-center mb-3">
+                      <span class="text-2xl mr-2">🌙</span>
+                      <span class="font-bold text-gray-800">夜猫子</span>
+                   </div>
+                   <div class="flex items-baseline mb-1">
+                      <span class="text-xl font-bold text-wc-green mr-2">{{ highlights.night_owl.user }}</span>
+                      <span class="text-xs text-gray-500">{{ highlights.night_owl.count }}条夜间消息</span>
+                   </div>
+                   <p class="text-xs text-gray-400">守护深夜的宁静与喧嚣</p>
                 </div>
-              </div>
-              {% endfor %}
-            </div>
+                {% endif %}
+             </div>
           </div>
         </div>
 
-        <!-- 用户画像页（替代词云） -->
-        <div class="swiper-slide bg-gradient-to-br from-indigo-600 to-purple-500">
-          <div class="text-center z-10 w-full max-w-md">
-            <h2 class="text-3xl font-bold text-white mb-6 animate-fade-in-up">
-              👤 群友档案
-            </h2>
-
-            <div class="space-y-3">
-              {% for profile in user_profiles[:6] %}
-              <div class="glass-card p-3 flex items-center animate-fade-in-up" style="animation-delay: {{ loop.index * 0.1 }}s;">
-                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-bold mr-3 flex-shrink-0">
-                  {{ profile.user[:1] }}
-                </div>
-                <div class="flex-1 text-left min-w-0">
-                  <div class="text-white font-medium text-sm truncate">{{ profile.user }}</div>
-                  <div class="text-white/60 text-xs">
-                    {{ profile.total_messages }}条 · 活跃{{ profile.active_days }}天 · 
-                    {% if profile.active_hour >= 22 or profile.active_hour <= 5 %}🌙夜猫子{% elif profile.active_hour <= 9 %}☀️早起鸟{% else %}☕常在线{% endif %}
-                  </div>
-                </div>
+        <!-- KEYWORDS -->
+        <div class="swiper-slide">
+           <div class="w-full max-w-md text-center">
+              <h2 class="text-2xl font-bold text-wc-primary mb-2 animate-enter">年度关键词</h2>
+              <p class="text-gray-400 text-sm mb-8 animate-enter delay-100">我们的共同语言</p>
+              
+              <div class="flex flex-wrap justify-center gap-3 animate-enter delay-200">
+                 {% for word in keywords[:15] %}
+                 <span 
+                   class="px-4 py-2 rounded-full border border-gray-200 bg-white shadow-sm text-gray-700 animate-scale"
+                   data-delay="{{ loop.index * 0.05 }}s" data-font-size="{{ 10 + (100 / (loop.index + 2)) }}px"
+                 >
+                    {{ word.word }}
+                 </span>
+                 {% endfor %}
               </div>
-              {% endfor %}
-            </div>
-          </div>
+           </div>
         </div>
 
-        <!-- 早晚鸟页 -->
-        <div class="swiper-slide bg-gradient-to-br from-amber-500 to-pink-500">
-          <div class="text-center z-10 w-full max-w-md">
-            <h2 class="text-3xl font-bold text-white mb-6 animate-fade-in-up">
-              ⏰ 作息档案
-            </h2>
-
-            <div class="space-y-4">
-              <!-- 早起鸟 -->
-              {% if highlights.early_bird and highlights.early_bird.user %}
-              <div class="glass-card p-5 animate-fade-in-up delay-100">
-                <div class="text-4xl mb-2">☀️</div>
-                <div class="text-white/70 text-sm">年度早起鸟</div>
-                <div class="text-white font-bold text-xl">{{ highlights.early_bird.user }}</div>
-                <div class="text-yellow-300 text-sm">{{ highlights.early_bird.days }} 天第一个发言</div>
+        <!-- USER PROFILES (MBTI) -->
+        {% if user_profiles_mbti %}
+        <div class="swiper-slide">
+           <div class="w-full max-w-md h-full flex flex-col pt-12">
+              <h2 class="text-2xl font-bold text-wc-primary mb-2 animate-enter px-2">群友群相</h2>
+              <p class="text-sm text-gray-400 mb-6 animate-enter delay-100 px-2 pl-2">MBTI 人格大揭秘</p>
+              
+              <div class="overflow-y-auto px-2 pb-12 space-y-4 flex-1 swiper-no-swiping" style="scrollbar-width: none;">
+                 {% for profile in user_profiles_mbti %}
+                 <div class="wechat-card p-4 animate-enter" data-delay="{{ loop.index * 0.1 }}s">
+                    <div class="flex items-center mb-3">
+                       <div class="w-10 h-10 rounded bg-gradient-to-br from-green-400 to-blue-500 text-white flex items-center justify-center font-bold text-lg mr-3 shadow-sm">{{ profile.user[:1] }}</div>
+                       <div class="flex-1">
+                          <div class="flex items-center justify-between">
+                             <div class="font-bold text-wc-primary">{{ profile.user }}</div>
+                             <div class="bg-indigo-50 text-indigo-600 text-xs px-2 py-0.5 rounded-full font-bold border border-indigo-100">{{ profile.mbti }}</div>
+                          </div>
+                          <div class="text-xs text-gray-400 mt-0.5">{{ profile.persona }}</div>
+                       </div>
+                    </div>
+                    <div class="text-sm text-gray-600 bg-gray-50 p-3 rounded leading-relaxed">
+                       {{ profile.description }}
+                    </div>
+                 </div>
+                 {% endfor %}
               </div>
-              {% endif %}
+           </div>
+        </div>
+        {% endif %}
 
-              <!-- 夜猫子 -->
-              {% if highlights.night_owl and highlights.night_owl.user %}
-              <div class="glass-card p-5 animate-fade-in-up delay-200">
-                <div class="text-4xl mb-2">🌙</div>
-                <div class="text-white/70 text-sm">年度夜猫子</div>
-                <div class="text-white font-bold text-xl">{{ highlights.night_owl.user }}</div>
-                <div class="text-yellow-300 text-sm">深夜发言 {{ highlights.night_owl.count }} 条</div>
+        <!-- WEEKLY AI SUMMARY (YEARLY REVIEW) -->
+        {% if weekly_ai_summary %}
+        <div class="swiper-slide">
+           <div class="w-full max-w-md h-full flex flex-col pt-12 pb-12">
+              <h2 class="text-2xl font-bold text-wc-primary mb-2 animate-enter px-2">AI 年度深度回顾</h2>
+              <p class="text-sm text-gray-400 mb-6 animate-enter delay-100 px-2 pl-2">基于 52 周全量数据的深度洞察</p>
+              
+              <div class="overflow-y-auto px-2 flex-1 relative swiper-no-swiping" style="scrollbar-width: none;">
+                 <div class="bg-white rounded-lg p-5 shadow-sm border-t-4 border-wc-green leading-relaxed text-gray-700 text-sm markdown-body animate-enter delay-200">
+                    {{ weekly_ai_summary | replace('\n', '<br>') | safe }}
+                 </div>
+                 <div class="h-8"></div>
               </div>
-              {% endif %}
+           </div>
+        </div>
+        {% endif %}
 
-              <!-- 巅峰日 -->
-              {% if highlights.peak_day and highlights.peak_day.date %}
-              <div class="glass-card p-5 animate-fade-in-up delay-300">
-                <div class="text-4xl mb-2">🎉</div>
-                <div class="text-white/70 text-sm">年度最热一天</div>
-                <div class="text-white font-bold text-xl">{{ highlights.peak_day.date }}</div>
-                <div class="text-yellow-300 text-sm">全天 {{ highlights.peak_day.count }} 条消息</div>
+        <!-- KEYWORDS -->
+        <div class="swiper-slide">
+           <div class="text-center w-full max-w-md">
+              <div class="text-6xl mb-6 animate-scale text-red-500">❤</div>
+              <h2 class="text-2xl font-bold text-wc-primary mb-4 animate-enter">感谢有你</h2>
+              <p class="text-gray-500 mb-10 animate-enter delay-200">
+                明年见 · {{ group_name }}
+              </p>
+              
+              <div class="wechat-card animate-enter delay-300 w-auto inline-block px-8">
+                 <div class="text-wc-green font-bold text-lg mb-1">{{ year }}</div>
+                 <div class="text-xs text-gray-400">年度回忆录</div>
               </div>
-              {% endif %}
-            </div>
-          </div>
+           </div>
         </div>
 
-        <!-- 年度关键词页 -->
-        <div class="swiper-slide bg-gradient-to-br from-blue-600 to-cyan-400">
-          <div class="text-center z-10 w-full max-w-md">
-            <h2 class="text-3xl font-bold text-white mb-6 animate-fade-in-up">
-              ☁️ 年度关键词
-            </h2>
-            <p class="text-white/60 text-sm mb-6 animate-fade-in-up delay-100">这一年，我们聊得最多的话题</p>
-
-            <div
-              class="flex flex-wrap justify-center gap-3 animate-fade-in-scale delay-200"
-            >
-              {% for word in keywords[:12] %}
-              <span
-                class="px-4 py-2 rounded-full text-white animate-float"
-                style="background: rgba(255,255,255,{{ 0.3 - loop.index * 0.02 }}); font-size: {{ 22 - loop.index * 0.8 }}px; animation-delay: {{ loop.index * 0.15 }}s;"
-              >
-                {{ word.word }}
-              </span>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-
-        <!-- 结尾页 -->
-        <div class="swiper-slide bg-gradient-end">
-          <div class="particles" id="particles-end"></div>
-          <div class="text-center z-10">
-            <div class="text-8xl mb-6 animate-pulse-slow">🎊</div>
-            <h2 class="text-4xl font-black text-white mb-4 animate-fade-in-up">
-              感谢有你们
-            </h2>
-            <p class="text-xl text-white/80 mb-8 animate-fade-in-up delay-200">
-              期待 {{ year + 1 }} 年的精彩继续
-            </p>
-            <div
-              class="glass-card px-6 py-3 inline-block animate-fade-in-up delay-300"
-            >
-              <p class="text-white/90">{{ group_name }} · {{ year }}</p>
-            </div>
-          </div>
-        </div>
       </div>
-
-      <!-- 分页指示器 -->
       <div class="swiper-pagination"></div>
     </div>
 
-    <!-- Swiper JS -->
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
-
-    <!-- GSAP -->
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12/dist/gsap.min.js"></script>
-
     <script>
-      // 初始化 Swiper
+      // --- Chart Data Handling ---
+      function getChartData(id) {
+        try {
+          const el = document.getElementById(id);
+          return el ? JSON.parse(el.textContent) : [];
+        } catch (e) {
+          console.error("Failed to parse chart data", e);
+          return [];
+        }
+      }
+
+      const chartData = {
+        hourly: getChartData('chart-data-hourly'),
+        monthly: getChartData('chart-data-monthly')
+      };
+      
+      let hourlyChart = null;
+      let monthlyChart = null;
+
+      function renderCharts() {
+        // Render Hourly Chart
+        if (document.getElementById('chart-hourly') && chartData.hourly.length > 0 && !hourlyChart) {
+           hourlyChart = echarts.init(document.getElementById('chart-hourly'));
+           hourlyChart.setOption({
+              color: ['#07c160'],
+              grid: { top: 20, right: 10, bottom: 20, left: 40 },
+              tooltip: { trigger: 'axis' },
+              xAxis: { type: 'category', data: Array.from({length: 24}, (_, i) => i + '时') },
+              yAxis: { type: 'value', splitLine: { lineStyle: { type: 'dashed' } } },
+              series: [{
+                 data: chartData.hourly,
+                 type: 'line',
+                 smooth: true,
+                 areaStyle: { opacity: 0.2 }
+              }]
+           });
+        }
+        
+        // Render Monthly Chart
+        if (document.getElementById('chart-monthly') && chartData.monthly.length > 0 && !monthlyChart) {
+           monthlyChart = echarts.init(document.getElementById('chart-monthly'));
+           monthlyChart.setOption({
+              color: ['#07c160'],
+              grid: { top: 20, right: 10, bottom: 20, left: 40 },
+              tooltip: { trigger: 'axis' },
+              xAxis: { type: 'category', data: Array.from({length: 12}, (_, i) => (i + 1) + '月') },
+              yAxis: { type: 'value', splitLine: { lineStyle: { type: 'dashed' } } },
+              series: [{
+                 data: chartData.monthly,
+                 type: 'bar',
+                 itemStyle: { borderRadius: [4, 4, 0, 0] }
+              }]
+           });
+        }
+      }
+
+      // --- Swiper & Animations ---
       const swiper = new Swiper(".swiper", {
         direction: "vertical",
         slidesPerView: 1,
@@ -832,58 +722,68 @@
           clickable: true,
         },
         on: {
-          slideChange: function () {
-            animateSlide(this.activeIndex);
+          slideChangeTransitionStart: function () {
+             animateSlide(this.activeIndex);
+             // Render/Resize charts when slide changes
+             setTimeout(renderCharts, 100); 
           },
           init: function () {
-            animateSlide(0);
+            setTimeout(() => {
+                animateSlide(0);
+                renderCharts();
+            }, 100);
           },
+          resize: function () {
+             if(hourlyChart) hourlyChart.resize();
+             if(monthlyChart) monthlyChart.resize();
+          }
         },
       });
 
-      // 页面动画
       function animateSlide(index) {
         const slide = document.querySelectorAll(".swiper-slide")[index];
         if (!slide) return;
-
-        // 重置动画
-        const animatedElements = slide.querySelectorAll('[class*="animate-"]');
+        
+        // Apply Dynamic Styles (from data attributes to avoid Jinja/IDE conflicts)
+        const dynamicElements = slide.querySelectorAll('[data-width], [data-delay], [data-font-size]');
+        dynamicElements.forEach(el => {
+           if (el.dataset.width) el.style.width = el.dataset.width;
+           if (el.dataset.delay) el.style.animationDelay = el.dataset.delay;
+           if (el.dataset.fontSize) el.style.fontSize = el.dataset.fontSize;
+        });
+        
+        // Restart Animations
+        const animatedElements = slide.querySelectorAll('.animate-enter, .animate-scale');
         animatedElements.forEach((el) => {
-          el.style.opacity = "0";
-          void el.offsetWidth; // 触发 reflow
-          el.style.opacity = "";
+          el.style.animation = 'none';
+          el.offsetHeight; /* trigger reflow */
+          el.style.animation = null; 
         });
 
-        // 数字滚动动画
+        // Number Rolling
         const countElements = slide.querySelectorAll("[data-count]");
         countElements.forEach((el) => {
-          const target = parseInt(el.dataset.count);
-          animateNumber(el, target);
+          animateNumber(el, parseInt(el.dataset.count));
         });
       }
 
-      // 数字滚动动画
-      function animateNumber(element, target) {
-        const duration = 1500;
-        const start = 0;
-        const startTime = performance.now();
-
-        function update(currentTime) {
-          const elapsed = currentTime - startTime;
-          const progress = Math.min(elapsed / duration, 1);
-          const easeProgress = 1 - Math.pow(1 - progress, 3);
-          const current = Math.floor(start + (target - start) * easeProgress);
-          element.textContent = current.toLocaleString();
-
-          if (progress < 1) {
-            requestAnimationFrame(update);
-          }
-        }
-
-        requestAnimationFrame(update);
+      function animateNumber(el, target) {
+         let start = 0;
+         const duration = 1200;
+         const step = timestamp => {
+            if (!start) start = timestamp;
+            const progress = Math.min((timestamp - start) / duration, 1);
+            el.innerText = Math.floor(progress * target);
+            if (progress < 1) {
+               window.requestAnimationFrame(step);
+            } else {
+               el.innerText = target;
+            }
+         };
+         window.requestAnimationFrame(step);
       }
 
-      // 背景音乐控制
+      // --- Audio Control ---
       const bgMusic = document.getElementById("bgMusic");
       const audioControl = document.getElementById("audioControl");
       let isPlaying = false;
@@ -893,48 +793,18 @@
           bgMusic.pause();
           audioControl.classList.remove("playing");
         } else {
-          bgMusic.play().catch((e) => console.log("音频播放需要用户交互"));
+          bgMusic.play().catch(e => console.log("Audio play failed", e));
           audioControl.classList.add("playing");
         }
         isPlaying = !isPlaying;
       }
-
-      // 首次交互自动播放
-      document.addEventListener(
-        "click",
-        function initMusic() {
-          if (!isPlaying) {
-            bgMusic
-              .play()
-              .then(() => {
-                isPlaying = true;
-                audioControl.classList.add("playing");
-              })
-              .catch((e) => console.log("音频播放失败"));
-          }
-          document.removeEventListener("click", initMusic);
-        },
-        { once: true }
-      );
-
-      // 创建粒子效果
-      function createParticles(containerId, count = 50) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-
-        for (let i = 0; i < count; i++) {
-          const particle = document.createElement("div");
-          particle.className = "particle";
-          particle.style.left = Math.random() * 100 + "%";
-          particle.style.top = Math.random() * 100 + "%";
-          particle.style.animationDelay = Math.random() * 6 + "s";
-          particle.style.opacity = Math.random() * 0.5 + 0.2;
-          container.appendChild(particle);
-        }
-      }
-
-      createParticles("particles-cover");
-      createParticles("particles-end");
+      
+      // Auto Play on first interaction
+      document.body.addEventListener('click', function() {
+         if(!isPlaying) {
+             toggleMusic();
+         }
+      }, { once: true });
     </script>
   </body>
 </html>

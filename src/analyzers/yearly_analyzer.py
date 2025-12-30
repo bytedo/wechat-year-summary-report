@@ -45,6 +45,80 @@ class YearlyAnalyzer:
             'keywords': self._get_yearly_keywords(),
             'fun_facts': self._get_fun_facts(),
             'user_profiles': self._get_user_profiles(),
+            'charts': self._get_charts_data(),
+            'quote_candidates': self._get_quote_candidates(),
+        }
+
+    def _get_quote_candidates(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        获取潜在的金句候选消息。
+        策略：
+        1. 长度适中 (10-100字)
+        2. 排除纯数字/URL
+        3. 优先包含标点符号或表情的消息
+        """
+        # 过滤
+        mask = (
+            (self.df['content'].str.len() >= 10) & 
+            (self.df['content'].str.len() <= 100) &
+            (~self.df['content'].str.contains('http', na=False)) &
+            (~self.df['content'].str.contains('红包', na=False)) &
+            (~self.df['content'].str.isnumeric())
+        )
+        candidates = self.df[mask]
+        
+        if candidates.empty:
+            return []
+            
+        # 简单随机采样，或者后续可以优化为按月份均匀采样
+        # 为了增加多样性，按月份分组采样
+        results = []
+        try:
+            # 尝试每组采几个
+            param_n = max(1, limit // 12)
+            subset = candidates.groupby('month').apply(
+                lambda x: x.sample(n=min(len(x), param_n))
+            )
+            # Flatten
+            if isinstance(subset, pd.DataFrame):
+                samples = subset
+            else:
+                # pandas groupby apply return varies
+                samples = subset.reset_index(level=0, drop=True)
+                
+            # 转换为 dict list
+            for _, row in samples.iterrows():
+                results.append({
+                    'user': row['user'],
+                    'content': row['content'],
+                    'date': row['date']
+                })
+        except Exception as e:
+            # Fallback random sample
+            print(f"Sampling error: {e}")
+            samples = candidates.sample(n=min(len(candidates), limit))
+            for _, row in samples.iterrows():
+                results.append({
+                    'user': row['user'],
+                    'content': row['content'],
+                    'date': row['date']
+                })
+                
+        return results
+
+    def _get_charts_data(self) -> Dict[str, Any]:
+        """获取图表所需数据"""
+        # 1. 24小时活跃度分布
+        hour_counts = self.df['hour'].value_counts().sort_index()
+        hourly_activity = [int(hour_counts.get(i, 0)) for i in range(24)]
+        
+        # 2. 月度活跃趋势
+        month_counts = self.df['month'].value_counts().sort_index()
+        monthly_activity = [int(month_counts.get(i, 0)) for i in range(1, 13)]
+        
+        return {
+            'hourly': hourly_activity,
+            'monthly': monthly_activity
         }
     
     def _get_overview(self) -> Dict[str, Any]:
