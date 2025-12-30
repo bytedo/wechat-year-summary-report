@@ -39,7 +39,6 @@
 ### ⏳ 怀旧数据挖掘
 
 - **巅峰日**：最活跃的一天及 AI 摘要
-- **打破沉默的英雄**：深夜/凌晨首发者统计
 - **年度初心**：成员首条消息回顾
 - **热门消息**：获得最多回复的发言
 
@@ -187,10 +186,12 @@ wechat-analyze/
 │   ├── stats_engine.py     # 统计分析引擎
 │   ├── ai_analyzer.py      # AI 分析代理
 │   ├── vector_engine.py    # 向量语义分析
+│   ├── report_builder.py   # 标准报告生成
 │   ├── poster_builder.py   # 海报报告生成
 │   └── analyzers/          # 扩展分析器
 │
 ├── templates/              # HTML 模板
+│   ├── report.html         # 标准报告模板
 │   └── poster/             # 海报式报告模板
 │
 ├── data/                   # 数据目录
