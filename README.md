@@ -113,6 +113,7 @@ python main.py data/chat_export.json
 | `--no-gpu`      | 禁用 GPU 加速，强制使用 CPU  | -        |
 | `--clusters`    | 话题聚类数量                 | `6`      |
 | `--mock`        | 强制使用 AI Mock 模式        | -        |
+| `--poster`      | 生成海报式报告（移动端优化） | -        |
 | `--music`       | 报告的背景音乐 URL           | -        |
 | `-v, --verbose` | 显示详细输出                 | -        |
 
