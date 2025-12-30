@@ -23,15 +23,18 @@
 ### 🧠 深度语义分析
 
 - **话题聚类**：基于 Sentence-BERT 向量语义分析
-- **智能命名**：AI 自动为聚类生成话题名称
+- **智能命名**：AI 自动为聚类生成描述性话题名称
+- **话题银河**：t-SNE 降维可视化，呈现消息语义分布
 - **消息关联**：识别语义相近的对话内容
 
 ### 🤖 AI 智能洞察
 
 - **群聊画像**：年度关键词 & 氛围总结
-- **用户画像**：Top 活跃用户性格分析
-- **话题总结**：自动归纳讨论主题
-- **金句甄选**：AI 挑选年度精彩发言
+- **MBTI 用户画像**：Top 活跃用户性格分析 + MBTI 类型预测
+- **周度深度分析**：按周批次分析消息，生成连贯的年度总结
+- **话题总结**：自动归纳每月讨论主题与回忆
+- **金句甄选**：AI 智能挑选年度精彩发言与入选理由
+- **分析缓存**：智能缓存 AI 分析结果，加速重复处理
 
 ### ⏳ 怀旧数据挖掘
 
@@ -40,10 +43,10 @@
 - **年度初心**：成员首条消息回顾
 - **热门消息**：获得最多回复的发言
 
-### 📱 多种报告格式
+### 📱 精美报告
 
-- **完整版报告**：桌面端优化，图表丰富
-- **海报版报告**：移动端优化，滑动浏览，支持背景音乐
+- **海报式报告**：移动端优化，支持 Swiper 滑动浏览、背景音乐
+- **语义银河可视化**：ECharts 散点图展示话题分布
 
 ---
 
@@ -111,14 +114,13 @@ python main.py data/chat_export.json
 | `--no-gpu`      | 禁用 GPU 加速，强制使用 CPU  | -        |
 | `--clusters`    | 话题聚类数量                 | `6`      |
 | `--mock`        | 强制使用 AI Mock 模式        | -        |
-| `--poster`      | 生成海报式报告（移动端优化） | -        |
-| `--music`       | 海报报告的背景音乐 URL       | -        |
+| `--music`       | 报告的背景音乐 URL           | -        |
 | `-v, --verbose` | 显示详细输出                 | -        |
 
 ### 使用示例
 
 ```bash
-# 生成标准报告
+# 生成报告
 python main.py data/qun.json
 
 # 指定输出目录
@@ -127,14 +129,11 @@ python main.py data/qun.json -o reports/
 # 跳过 AI 分析（快速模式）
 python main.py data/qun.json --no-ai
 
-# 生成海报版报告（适合手机分享）
-python main.py data/qun.json --poster
-
-# 带背景音乐的海报报告
-python main.py data/qun.json --poster --music "https://example.com/bgm.mp3"
+# 带背景音乐的报告
+python main.py data/qun.json --music "https://example.com/bgm.mp3"
 
 # 完整模式（详细输出）
-python main.py data/qun.json --poster -v
+python main.py data/qun.json -v
 ```
 
 ---
@@ -188,13 +187,11 @@ wechat-analyze/
 │   ├── stats_engine.py     # 统计分析引擎
 │   ├── ai_analyzer.py      # AI 分析代理
 │   ├── vector_engine.py    # 向量语义分析
-│   ├── report_builder.py   # HTML 报告生成
 │   ├── poster_builder.py   # 海报报告生成
 │   └── analyzers/          # 扩展分析器
 │
 ├── templates/              # HTML 模板
-│   ├── report.html         # 完整版报告模板
-│   └── poster/             # 海报版报告模板
+│   └── poster/             # 海报式报告模板
 │
 ├── data/                   # 数据目录
 │   └── stopwords.txt       # 中文停用词表
@@ -228,6 +225,7 @@ wechat-analyze/
 | --------------- | ------------- |
 | TailwindCSS 3.x | 样式框架      |
 | ECharts 5.x     | 数据可视化    |
+| Swiper.js       | 滑动交互      |
 | Marked.js       | Markdown 渲染 |
 
 ---
@@ -256,9 +254,9 @@ wechat-analyze/
 
 **A:** 确保已安装 CUDA 版本的 PyTorch。可使用 `--no-gpu` 强制使用 CPU。
 
-### Q: 海报报告在电脑上显示异常？
+### Q: 报告在电脑上显示异常？
 
-**A:** 海报版专为移动端优化，建议在手机上竖屏查看。
+**A:** 报告专为移动端优化，建议在手机上竖屏查看，或使用浏览器开发者工具切换到移动端视图。
 
 ---
 
@@ -269,6 +267,9 @@ wechat-analyze/
 - [x] 向量语义聚类
 - [x] 海报式报告
 - [x] 怀旧数据挖掘
+- [x] MBTI 用户画像
+- [x] 语义银河可视化
+- [x] AI 分析结果缓存
 - [ ] 个人年度报告
 - [ ] 多群聊对比分析
 - [ ] 交互式网页版

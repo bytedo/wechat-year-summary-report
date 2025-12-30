@@ -13,6 +13,9 @@
 
     <!-- ECharts -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    
+    <!-- Marked.js for Markdown Rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   </head>
   <body>
     <!-- Data Injection for Charts -->
@@ -283,13 +286,33 @@
         margin: 0 auto 24px;
         box-shadow: 0 4px 12px rgba(7, 193, 96, 0.3);
       }
+
+      /* Simple Markdown Styles */
+      .markdown-body h1, .markdown-body h2, .markdown-body h3 {
+          font-weight: bold;
+          margin-top: 1em;
+          margin-bottom: 0.5em;
+          color: var(--wc-text-primary);
+      }
+      .markdown-body h3 { font-size: 1.1em; }
+      .markdown-body p { margin-bottom: 0.8em; }
+      .markdown-body ul, .markdown-body ol { padding-left: 1.5em; margin-bottom: 0.8em; list-style-type: disc; }
+      .markdown-body li { margin-bottom: 0.3em; }
+      .markdown-body strong { color: var(--wc-text-primary); font-weight: 600; }
+      .markdown-body blockquote {
+          border-left: 3px solid var(--wc-green);
+          padding-left: 1em;
+          color: var(--wc-text-secondary);
+          margin-left: 0;
+          margin-bottom: 0.8em;
+      }
     </style>
   </head>
   <body>
     <!-- Background Music -->
     <audio id="bgMusic" loop preload="auto">
       <source
-        src="{{ music_url | default('https://music.163.com/song/media/outer/url?id=1901371647.mp3') }}"
+        src="{{ music_url | default('https://2025.wdao.de/year-end-summary/ephemeral%20memories.mp3') }}"
         type="audio/mpeg"
       />
     </audio>
@@ -575,7 +598,7 @@
               
               <div class="overflow-y-auto px-2 pb-12 flex-1 swiper-no-swiping" style="scrollbar-width: none;">
                  <div class="space-y-3">
-                    {% for profile in user_profiles_mbti[:10] %}
+                    {% for profile in user_profiles_mbti %}
                     <!-- 消息气泡样式 -->
                     <div class="animate-enter flex items-start gap-2 {{ 'flex-row-reverse' if loop.index % 2 == 0 else '' }}" data-delay="{{ loop.index * 0.12 }}s">
                        <div class="max-w-[85%]">
@@ -603,6 +626,45 @@
         </div>
         {% endif %}
 
+        <!-- SEMANTIC GALAXY (Vector Scatter Chart) -->
+        {% if has_vector_data %}
+        <div class="swiper-slide">
+           <div class="w-full max-w-md h-full flex flex-col pt-8 pb-8 relative">
+              <!-- 星空背景装饰 (Removed for simplicity) -->
+              <!-- Galaxy background effects removed as per request for cleaner look -->
+
+              
+              <h2 class="text-2xl font-bold text-wc-primary mb-1 animate-enter px-2 relative z-10">🌌 话题星系</h2>
+              <p class="text-sm text-gray-400 mb-3 animate-enter delay-100 px-2 relative z-10">每个光点都是一段对话的回忆</p>
+              
+              <!-- 话题统计卡片 -->
+              {% if vector_data.cluster_stats %}
+              <div class="flex gap-2 px-2 mb-3 overflow-x-auto animate-enter delay-150 relative z-10" style="scrollbar-width: none;">
+                 {% for stat in vector_data.cluster_stats[:4] %}
+                 <div class="flex-shrink-0 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-sm border border-gray-100">
+                    <div class="text-xs text-gray-400">{{ stat.name or ('话题'~loop.index) }}</div>
+                    <div class="text-sm font-bold text-wc-green">{{ stat.count }}条</div>
+                 </div>
+                 {% endfor %}
+              </div>
+              {% endif %}
+              
+              <!-- 图表区域 -->
+              <div class="flex-1 bg-gradient-to-b from-gray-50 to-white rounded-xl shadow-sm p-2 animate-enter delay-200 swiper-no-swiping relative overflow-hidden" style="min-height: 300px;">
+                 <!-- 装饰边框 -->
+                 <div class="absolute inset-0 rounded-xl border border-gray-100 pointer-events-none"></div>
+                 <div id="chart-galaxy" style="width: 100%; height: 100%;"></div>
+              </div>
+              
+              <div class="flex items-center justify-center gap-2 mt-3 animate-enter delay-300 relative z-10">
+                 <span class="text-[10px] text-gray-400">👆 双指缩放探索</span>
+                 <span class="text-gray-200">|</span>
+                 <span class="text-[10px] text-gray-400">👀 点击查看详情</span>
+              </div>
+           </div>
+        </div>
+        {% endif %}
+
         <!-- WEEKLY AI SUMMARY (YEARLY REVIEW) -->
         {% if weekly_ai_summary %}
         <div class="swiper-slide">
@@ -611,11 +673,16 @@
               <p class="text-sm text-gray-400 mb-6 animate-enter delay-100 px-2 pl-2">基于 52 周全量数据的深度洞察</p>
               
               <div class="overflow-y-auto px-2 flex-1 relative swiper-no-swiping" style="scrollbar-width: none;">
-                 <div class="bg-white rounded-lg p-5 shadow-sm border-t-4 border-wc-green leading-relaxed text-gray-700 text-sm markdown-body animate-enter delay-200">
-                    {{ weekly_ai_summary | replace('\n', '<br>') | safe }}
+                 <div id="ai-summary-content" class="bg-white rounded-lg p-5 shadow-sm border-t-4 border-wc-green leading-relaxed text-gray-700 text-sm markdown-body animate-enter delay-200">
+                    <!-- Content will be rendered by JS -->
                  </div>
                  <div class="h-8"></div>
               </div>
+              
+              <!-- Hidden Source Data -->
+              <script id="ai-summary-data" type="text/plain">
+{{ weekly_ai_summary | safe }}
+              </script>
            </div>
         </div>
         {% endif %}
@@ -661,6 +728,7 @@
       
       let hourlyChart = null;
       let monthlyChart = null;
+      let galaxyChart = null;
 
       function renderCharts() {
         // Render Hourly Chart
@@ -697,6 +765,114 @@
               }]
            });
         }
+        
+        // Render Galaxy Chart (Vector Clustering)
+        {% if has_vector_data %}
+        if (document.getElementById('chart-galaxy') && !galaxyChart) {
+           const scatterData = {{ vector_data.scatter_data | tojson | safe }};
+           const clusterStats = {{ vector_data.cluster_stats | tojson | safe }};
+           
+           // 星系主题色彩配置（更丰富的渐变色）
+           const clusterColors = [
+               { main: '#10B981', glow: 'rgba(16, 185, 129, 0.5)' },  // 翡翠绿
+               { main: '#3B82F6', glow: 'rgba(59, 130, 246, 0.5)' },  // 天空蓝
+               { main: '#8B5CF6', glow: 'rgba(139, 92, 246, 0.5)' },  // 梦幻紫
+               { main: '#F59E0B', glow: 'rgba(245, 158, 11, 0.5)' },  // 琥珀金
+               { main: '#EC4899', glow: 'rgba(236, 72, 153, 0.5)' },  // 玫瑰红
+               { main: '#06B6D4', glow: 'rgba(6, 182, 212, 0.5)' },   // 青碧色
+               { main: '#EF4444', glow: 'rgba(239, 68, 68, 0.5)' },   // 热情红
+               { main: '#84CC16', glow: 'rgba(132, 204, 22, 0.5)' }   // 青柠绿
+           ];
+           
+           // 按聚类分组数据
+           const seriesData = {};
+           let maxClusterSize = 0;
+           scatterData.forEach(point => {
+               const clusterId = point.cluster_id;
+               if (!seriesData[clusterId]) {
+                   seriesData[clusterId] = [];
+               }
+               seriesData[clusterId].push([point.x, point.y, point.content, point.user]);
+           });
+           
+           // 计算每个聚类的大小
+           Object.keys(seriesData).forEach(k => {
+               if (seriesData[k].length > maxClusterSize) maxClusterSize = seriesData[k].length;
+           });
+           
+           // 构建 series（星云效果）
+           const galaxySeries = [];
+           Object.keys(seriesData).forEach(clusterId => {
+               const stat = clusterStats.find(s => s.cluster_id === parseInt(clusterId)) || {};
+               const colorConfig = clusterColors[clusterId % clusterColors.length];
+               const clusterSize = seriesData[clusterId].length;
+               
+               // 主数据点
+               galaxySeries.push({
+                   name: stat.name || `话题 ${parseInt(clusterId) + 1}`,
+                   type: 'scatter',
+                   data: seriesData[clusterId],
+                   symbolSize: 4,
+                   itemStyle: {
+                       color: colorConfig.main,
+                       borderColor: 'transparent',
+                       borderWidth: 0,
+                       opacity: 0.7
+                   },
+                   emphasis: {
+                       scale: 1.5,
+                       itemStyle: { opacity: 1 }
+                   }
+               });
+           });
+           
+           galaxyChart = echarts.init(document.getElementById('chart-galaxy'));
+           galaxyChart.setOption({
+               backgroundColor: 'transparent',
+               tooltip: {
+                   trigger: 'item',
+                   backgroundColor: 'rgba(255,255,255,0.95)',
+                   borderColor: '#eee',
+                   borderWidth: 1,
+                   padding: [10, 14],
+                   textStyle: { color: '#333', fontSize: 12 },
+                   formatter: function(params) {
+                       const [x, y, content, user] = params.data;
+                       return `<div style="max-width: 200px;">
+                           <div style="color: ${params.color}; font-weight: bold; margin-bottom: 4px;">${user}</div>
+                           <div style="font-size: 11px; line-height: 1.4; color: #555;">${content.substring(0, 60)}${content.length > 60 ? '...' : ''}</div>
+                           <div style="margin-top: 6px; font-size: 10px; color: #999;">${params.seriesName}</div>
+                       </div>`;
+                   }
+               },
+               legend: {
+                   type: 'scroll',
+                   data: galaxySeries.map(s => s.name),
+                   top: 5,
+                   left: 'center',
+                   textStyle: { fontSize: 10, color: '#666' },
+                   itemWidth: 10,
+                   itemHeight: 10,
+                   itemGap: 10,
+                   selectedMode: 'multiple'
+               },
+               grid: { left: 5, right: 5, bottom: 5, top: 40, containLabel: false },
+               xAxis: { type: 'value', show: false },
+               yAxis: { type: 'value', show: false },
+               dataZoom: [
+                   { type: 'inside', xAxisIndex: 0, zoomOnMouseWheel: true, moveOnMouseMove: true },
+                   { type: 'inside', yAxisIndex: 0, zoomOnMouseWheel: true, moveOnMouseMove: true }
+               ],
+               series: galaxySeries,
+               animation: false
+           });
+           
+           // 点击图例时的动画效果
+           galaxyChart.on('legendselectchanged', function() {
+               galaxyChart.resize();
+           });
+        }
+        {% endif %}
       }
 
       // --- Swiper & Animations ---
@@ -724,6 +900,7 @@
           resize: function () {
              if(hourlyChart) hourlyChart.resize();
              if(monthlyChart) monthlyChart.resize();
+             if(galaxyChart) galaxyChart.resize();
           }
         },
       });
@@ -787,6 +964,28 @@
         isPlaying = !isPlaying;
       }
       
+      // Render Markdown
+      document.addEventListener('DOMContentLoaded', () => {
+          const aiSummaryData = document.getElementById('ai-summary-data');
+          const aiSummaryContainer = document.getElementById('ai-summary-content');
+          
+          if (aiSummaryData && aiSummaryContainer && window.marked) {
+              try {
+                  const rawMarkdown = aiSummaryData.textContent.trim();
+                  // Configure marked to handle line breaks correctly
+                  marked.setOptions({
+                      breaks: true,
+                      gfm: true
+                  });
+                  aiSummaryContainer.innerHTML = marked.parse(rawMarkdown);
+              } catch (e) {
+                  console.error("Markdown rendering failed", e);
+                  // Fallback
+                  aiSummaryContainer.innerText = aiSummaryData.textContent;
+              }
+          }
+      });
+
       // Auto Play on first interaction
       document.body.addEventListener('click', function() {
          if(!isPlaying) {

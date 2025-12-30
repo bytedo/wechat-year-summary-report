@@ -19,7 +19,6 @@ sys.path.insert(0, str(Path(__file__).parent / 'src'))
 from src.data_loader import load_chat_data
 from src.stats_engine import calculate_stats, format_stats_for_display, calculate_memories_stats
 from src.ai_analyzer import AIAnalyzer
-from src.report_builder import generate_report
 from src.vector_engine import SemanticAnalyzer
 from src.poster_builder import generate_poster_report
 
@@ -45,8 +44,7 @@ def main():
     parser.add_argument('--clusters', type=int, default=6, help='聚类数量 (默认: 6)')
     parser.add_argument('--mock', action='store_true', help='强制使用 AI Mock 模式')
     parser.add_argument('-v', '--verbose', action='store_true', help='显示详细输出')
-    parser.add_argument('--poster', action='store_true', help='生成海报式报告（移动端优化）')
-    parser.add_argument('--music', type=str, default=None, help='海报报告的背景音乐 URL')
+    parser.add_argument('--music', type=str, default=None, help='报告的背景音乐 URL')
     
     args = parser.parse_args()
     
@@ -189,40 +187,24 @@ def main():
                 import traceback
                 traceback.print_exc()
         
-        # Step 6: 生成报告
-        print("\n📝 正在生成 HTML 报告...")
-        output_path = generate_report(
+        # Step 6: 生成海报式报告
+        print("\n🎬 正在生成海报式报告...")
+        output_path = generate_poster_report(
             session_info=session_info,
-            stats_data=formatted_stats,
-            ai_result=ai_result,
+            df=df,
+            memories_data=memories_data,
             output_dir=args.output,
-            vector_data=vector_data,
-            memories_data=memories_data
+            music_url=args.music,
+            vector_data=vector_data
         )
-        print(f"   ✓ 完整版报告: {output_path}")
-        
-        # Step 7: 生成海报式报告（可选）
-        poster_path = None
-        if args.poster:
-            print("\n🎬 正在生成海报式报告...")
-            poster_path = generate_poster_report(
-                session_info=session_info,
-                df=df,
-                memories_data=memories_data,
-                output_dir=args.output,
-                music_url=args.music
-            )
-            print(f"   ✓ 海报版报告: {poster_path}")
+        print(f"   ✓ 报告已生成: {output_path}")
         
         print(f"\n{'='*50}")
         print("✅ 报告生成成功!")
         print(f"{'='*50}")
-        print(f"\n📄 完整版报告: {output_path}")
-        if poster_path:
-            print(f"📱 海报版报告: {poster_path}")
+        print(f"\n📱 报告路径: {output_path}")
         print("\n💡 提示: 用浏览器打开 HTML 文件即可查看报告")
-        if poster_path:
-            print("   海报版建议在手机上竖屏查看，效果更佳！")
+        print("   建议在手机上竖屏查看，效果更佳！")
         
     except Exception as e:
         print(f"\n❌ 发生错误: {e}")

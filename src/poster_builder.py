@@ -41,7 +41,8 @@ class PosterBuilder:
         memories_data: dict = None,
         output_path: str = None,
         music_url: str = None,
-        use_ai: bool = True
+        use_ai: bool = True,
+        vector_data: dict = None
     ) -> str:
         """
         生成海报式报告。
@@ -53,6 +54,7 @@ class PosterBuilder:
             output_path: 输出路径
             music_url: 背景音乐 URL
             use_ai: 是否使用 AI 生成话题回忆
+            vector_data: 向量聚类数据（用于散点图可视化）
             
         返回:
             生成的 HTML 内容
@@ -74,7 +76,7 @@ class PosterBuilder:
             ai_analyzer = AIAnalyzer()
             
             # 1. 生成周度深度总结 & 获取周结构化数据（必须先完成，后续依赖）
-            print("   📊 1/3 正在进行周度全量扫描...")
+            print("   📊 1/4 正在进行周度全量扫描...")
             from .analyzers.weekly_analyzer import get_weekly_samples_for_ai
             weekly_samples = get_weekly_samples_for_ai(df, max_per_week=1000)
             weekly_ai_summary, weekly_summaries_dict = ai_analyzer.analyze_weekly_batches(weekly_samples)
@@ -82,19 +84,30 @@ class PosterBuilder:
             
             # 2. 基于周报生成月度话题回忆 (更精准)
             if monthly_data:
-                print("   📅 2/3 正在生成月度话题回忆 (基于周报)...")
+                print("   📅 2/4 正在生成月度话题回忆 (基于周报)...")
                 if weekly_summaries_dict:
                     topic_memories = ai_analyzer.generate_monthly_summary_from_weekly(monthly_data, weekly_summaries_dict)
                 else:
                     topic_memories = ai_analyzer.generate_topic_memories(monthly_data)
                 print(f"   ✓ 已生成 {len(topic_memories)} 个月的话题回忆")
             
-            # 3. 生成用户画像及 MBTI
-            print("   👥 3/3 正在生成用户画像...")
-            top_users = [u['user'] for u in yearly_data.get('rankings', {}).get('top_talkers', [])[:10]]
-            if top_users:
-                user_profiles_mbti = ai_analyzer.generate_user_profiles_with_mbti(df, top_users)
+            # 3. 生成用户画像及 MBTI（分析所有群友）
+            print("   👥 3/4 正在生成用户画像...")
+            # 获取所有用户（按发言数量排序）
+            user_counts = df['user'].value_counts()
+            all_users = user_counts.index.tolist()
+            if all_users:
+                user_profiles_mbti = ai_analyzer.generate_user_profiles_with_mbti(df, all_users)
                 print(f"   ✓ 已生成 {len(user_profiles_mbti)} 位用户的 MBTI 画像")
+            
+            # 4. AI 筛选年度关键词
+            raw_keywords = yearly_data.get('keywords', [])
+            if raw_keywords:
+                print("   🏷️ 4/4 正在筛选年度关键词...")
+                refined_keywords = ai_analyzer.refine_keywords(raw_keywords)
+                # 更新 yearly_data 中的关键词
+                yearly_data['keywords'] = refined_keywords
+                print(f"   ✓ 已筛选 {len(refined_keywords)} 个年度关键词")
         
         # 构建上下文
         context = {
@@ -121,6 +134,10 @@ class PosterBuilder:
             # 图表数据
             'charts': yearly_data.get('charts', {}),
             
+            # 向量聚类数据（散点图可视化）
+            'has_vector_data': vector_data is not None and len(vector_data.get('scatter_data', [])) > 0,
+            'vector_data': vector_data,
+            
             # 背景音乐
             'music_url': music_url,
         }
@@ -145,7 +162,8 @@ def generate_poster_report(
     memories_data: dict = None,
     output_dir: str = None,
     filename: str = None,
-    music_url: str = None
+    music_url: str = None,
+    vector_data: dict = None
 ) -> str:
     """
     便捷函数：生成海报式报告。
@@ -157,6 +175,7 @@ def generate_poster_report(
         output_dir: 输出目录
         filename: 文件名（不含扩展名）
         music_url: 背景音乐 URL
+        vector_data: 向量聚类数据（用于散点图）
         
     返回:
         输出文件路径
@@ -175,6 +194,6 @@ def generate_poster_report(
     output_path = Path(output_dir) / f"{filename}.html"
     
     builder = PosterBuilder()
-    builder.build(session_info, df, memories_data, str(output_path), music_url)
+    builder.build(session_info, df, memories_data, str(output_path), music_url, vector_data=vector_data)
     
     return str(output_path)

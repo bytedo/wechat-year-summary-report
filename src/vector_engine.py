@@ -132,7 +132,7 @@ class SemanticAnalyzer:
         cluster_labels, cluster_centers = self._cluster(embeddings)
         
         # Step 3: 降维 (仅用于可视化，数据量大时采样)
-        MAX_VIS_SAMPLES = 3000
+        MAX_VIS_SAMPLES = 8000  # 可视化最大采样数
         n_samples = len(embeddings)
         
         if n_samples > MAX_VIS_SAMPLES:

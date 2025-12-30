@@ -55,7 +55,16 @@ def retry_on_failure(max_retries: int = 3, base_delay: float = 1.0, exceptions: 
 class AIAnalyzer:
     """
     AI 分析器，支持 OpenAI 兼容接口（DeepSeek/Moonshot 等）。
+    
+    通过 `LLM_REQUEST_DELAY` 环境变量控制请求间延迟（秒），默认 2 秒。
+    增加该值可有效降低 504 超时错误发生的概率。
     """
+    
+    # 请求间延迟配置（从环境变量读取，默认 2 秒）
+    REQUEST_DELAY = float(os.getenv('LLM_REQUEST_DELAY', '2.0'))
+    
+    # 上次请求时间（用于计算需要等待的时间）
+    _last_request_time: float = 0
     
     def __init__(self, base_url: str = None, api_key: str = None, model: str = None):
         """
@@ -84,6 +93,20 @@ class AIAnalyzer:
                 logger.warning("openai 库未安装，启用 Mock 模式")
                 self.mock_mode = True
     
+    def _wait_for_rate_limit(self):
+        """
+        等待以满足请求速率限制。
+        
+        确保两次 API 调用之间至少间隔 REQUEST_DELAY 秒，
+        防止因请求过于密集导致 504 网关超时。
+        """
+        if AIAnalyzer._last_request_time > 0:
+            elapsed = time.time() - AIAnalyzer._last_request_time
+            if elapsed < self.REQUEST_DELAY:
+                wait_time = self.REQUEST_DELAY - elapsed
+                logger.debug(f"速率限制：等待 {wait_time:.1f} 秒...")
+                time.sleep(wait_time)
+    
     def _call_api(
         self,
         messages: List[dict],
@@ -92,7 +115,7 @@ class AIAnalyzer:
         max_retries: int = 3
     ) -> str:
         """
-        带重试机制的 API 调用。
+        带速率限制和重试机制的 API 调用。
         
         参数:
             messages: 对话消息列表
@@ -104,26 +127,52 @@ class AIAnalyzer:
             API 响应内容
         """
         last_exception = None
+        
         for attempt in range(max_retries + 1):
             try:
+                # 请求前等待，满足速率限制
+                self._wait_for_rate_limit()
+                
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=messages,
                     temperature=temperature,
                     max_tokens=max_tokens
                 )
+                
+                # 更新上次请求时间
+                AIAnalyzer._last_request_time = time.time()
+                
                 content = self._extract_content(response)
                 if content:
                     return content
                 raise ValueError("API 返回空内容")
+                
             except Exception as e:
                 last_exception = e
+                error_str = str(e).lower()
+                
+                # 检测 504 网关超时错误，采用更长的退避时间
+                is_504_error = '504' in error_str or 'gateway' in error_str or 'timeout' in error_str
+                
                 if attempt < max_retries:
-                    delay = 1.0 * (2 ** attempt)  # 指数退避: 1s, 2s, 4s
-                    logger.warning(f"API 调用失败 (尝试 {attempt + 1}/{max_retries + 1}): {e}，{delay:.1f}秒后重试...")
+                    if is_504_error:
+                        # 504 错误使用更长的退避时间 (5s, 10s, 15s)
+                        delay = 5.0 * (attempt + 1)
+                        logger.warning(f"⚠️ API 504 超时 (尝试 {attempt + 1}/{max_retries + 1}): 服务端繁忙，{delay:.0f} 秒后重试...")
+                    else:
+                        # 普通错误使用指数退避 (2s, 4s, 8s)
+                        delay = 2.0 * (2 ** attempt)
+                        logger.warning(f"API 调用失败 (尝试 {attempt + 1}/{max_retries + 1}): {e}，{delay:.1f} 秒后重试...")
+                    
                     time.sleep(delay)
+                    
+                    # 504 错误后还需额外重置速率限制计时器
+                    if is_504_error:
+                        AIAnalyzer._last_request_time = time.time()
                 else:
                     logger.error(f"API 调用失败，已达最大重试次数: {e}")
+        
         raise last_exception
     
     def analyze(self, df: pd.DataFrame, top_users: List[dict]) -> dict:
@@ -465,7 +514,7 @@ class AIAnalyzer:
                 messages=[
                     {
                         "role": "system",
-                        "content": "你是一个擅长发现群聊故事的话题命名师。请根据消息样本，为每个话题组起一个温馨有趣的名字（2-6个字），让群友们看到这个名字就能回忆起当时的快乐时光。"
+                        "content": "你是群聊星系的命名大师，擅长用电影片名或小说章节的风格为话题组起名。你的名字要有故事感、画面感，能让群友一看就想起那些美好时光。严禁使用功能性、事务性、负面的命名。"
                     },
                     {"role": "user", "content": prompt}
                 ],
@@ -481,26 +530,32 @@ class AIAnalyzer:
     
     def _build_cluster_prompt(self, cluster_representatives: dict) -> str:
         """构建聚类命名的提示词。"""
-        lines = ["以下是通过向量算法自动聚类的群聊消息组，请为每组起一个简短有趣的名字。\n"]
+        lines = ["以下是通过向量算法自动聚类的群聊消息组，请为每组起一个充满故事感的名字。\n"]
         
         for cluster_id, messages in cluster_representatives.items():
             if not messages:
                 continue
             
             lines.append(f"## 分组 {cluster_id}")
-            for msg in messages[:5]:  # 每组最多展示5条
-                content = msg['content'][:50]  # 截断长内容
+            for msg in messages[:8]:  # 每组展示8条增加理解
+                content = msg['content'][:80]  # 截断长内容
                 lines.append(f"- {msg['user']}: {content}")
             lines.append("")
         
         lines.append("""
 请返回 JSON 格式的结果，例如：
-{"0": "午餐拼单", "1": "技术交流", "2": "摸鱼时间"}
+{"0": "深夜食堂", "1": "午后摸鱼时光", "2": "周末奇遇记"}
 
-注意：
-- 名字要简短（2-6个字）
-- 可以幽默有趣
-- 要能反映该组消息的主题""")
+## 命名风格要求：
+- **像电影片名**：有画面感、故事感（如"深夜食堂"、"那些年我们一起追的剧"）
+- **像小说章节**：温馨有趣（如"午后摸鱼时光"、"打工人的日常"）
+- **简短有力**：2-6个字，朗朗上口
+- **勾起回忆**：让群友一看就能想起那些对话
+
+## ⛔ 禁止使用：
+- 功能性命名（如"需求招募"、"问题解答"、"信息咨询"）
+- 抽象命名（如"难以启齿"、"深度交流"、"综合讨论"）
+- 负面命名（如"分手"、"吐槽"、"抱怨"、"冲突"）""")
         
         return "\n".join(lines)
     
@@ -543,6 +598,78 @@ class AIAnalyzer:
             result[cluster_id] = name
         
         return result
+    
+    def refine_keywords(self, raw_keywords: list, sample_messages: list = None) -> list:
+        """
+        使用 AI 筛选并优化年度关键词。
+        
+        参数:
+            raw_keywords: jieba 分词后的高频词列表 [{'word': '...', 'count': N}, ...]
+            sample_messages: 可选，消息样本用于上下文理解
+            
+        返回:
+            [{'word': '关键词'}, ...]
+        """
+        if not raw_keywords:
+            return []
+        
+        if self.mock_mode:
+            return self._mock_refine_keywords(raw_keywords)
+        
+        # 提取词语列表
+        words_text = "、".join([f"{kw['word']}({kw['count']}次)" for kw in raw_keywords[:50]])
+        
+        prompt = f"""请从以下高频词中筛选出 **8-12 个** 最能代表群聊年度特色的关键词。
+
+## 候选高频词（按出现次数）：
+{words_text}
+
+## 筛选标准：
+1. **有意义的词语**：名词、动词、形容词，能让人联想到具体场景
+2. **群聊特色词**：能体现群友们共同话题、习惯或记忆的词
+3. **排除无意义词**：如"一个"、"然后"、"这个"、"什么"等口水词
+4. **排除过于通用的词**：如"知道"、"可以"、"没有"等
+
+## 输出格式：
+直接返回一个 JSON 字符串数组，例如：
+["加班", "奶茶", "摸鱼", "开会", "周末"]
+
+请筛选出最能唤起群友回忆的词语："""
+        
+        try:
+            content = self._call_api(
+                messages=[
+                    {"role": "system", "content": "你是群聊年度回忆编辑，擅长从高频词中发现能唤起群友共同回忆的关键词。只输出JSON字符串数组。"},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=200
+            )
+            
+            # 解析 JSON
+            import json
+            import re
+            json_match = re.search(r'\[[\s\S]*\]', content)
+            if json_match:
+                words = json.loads(json_match.group())
+                # 转换为统一格式
+                return [{'word': w} for w in words[:12] if isinstance(w, str)]
+            
+        except Exception as e:
+            logger.warning(f"关键词筛选失败: {e}")
+        
+        return self._mock_refine_keywords(raw_keywords)
+    
+    def _mock_refine_keywords(self, raw_keywords: list) -> list:
+        """Mock 模式：简单过滤返回"""
+        # 简单过滤，去除太短或太通用的词
+        stopwords = {'一个', '这个', '那个', '什么', '怎么', '可以', '没有', '知道', '然后', '现在', '时候', '因为', '所以', '但是', '还是', '已经', '就是', '不是', '真的', '觉得'}
+        filtered = [
+            {'word': kw['word']}
+            for kw in raw_keywords[:15]
+            if kw['word'] not in stopwords and len(kw['word']) >= 2
+        ]
+        return filtered[:10]
     
     def select_golden_quotes(self, hot_messages: list) -> list:
         """
@@ -815,12 +942,13 @@ class AIAnalyzer:
                 'memory': self._mock_topic_memory(month_info)
             }
     
-    def analyze_weekly_batches(self, weekly_samples: list) -> tuple[str, dict]:
+    def analyze_weekly_batches(self, weekly_samples: list, use_cache: bool = True) -> tuple[str, dict]:
         """
         按周批次分析消息，生成年度深度总结。
         
         参数:
             weekly_samples: 每周消息样本列表 [{'week': '...', 'messages': [...]}, ...]
+            use_cache: 是否使用缓存（默认开启）
             
         返回:
             (年度总结文本, 每周总结字典 {'2024-W01': '总结内容...'})
@@ -830,6 +958,34 @@ class AIAnalyzer:
         
         if self.mock_mode:
             return "（Mock模式跳过深度周度分析）", {}
+        
+        # === 缓存处理 ===
+        import hashlib
+        import json
+        from pathlib import Path
+        
+        # 缓存放在项目的 tmp 目录
+        cache_dir = Path(__file__).parent.parent / "tmp"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 计算数据哈希（用于判断数据是否变化）
+        cache_key_data = json.dumps([
+            {'week': w['week'], 'count': len(w['messages']), 
+             'sample': w['messages'][0]['content'][:50] if w['messages'] else ''}
+            for w in weekly_samples
+        ], ensure_ascii=False, sort_keys=True)
+        cache_hash = hashlib.md5(cache_key_data.encode()).hexdigest()[:12]
+        cache_file = cache_dir / f"weekly_analysis_{cache_hash}.json"
+        
+        # 尝试读取缓存
+        if use_cache and cache_file.exists():
+            try:
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    cached = json.load(f)
+                    print(f"   💾 已加载周度分析缓存 ({len(cached.get('weekly_summaries', {}))} 周)")
+                    return cached.get('yearly_summary', ''), cached.get('weekly_summaries', {})
+            except Exception as e:
+                logger.warning(f"缓存读取失败: {e}")
         
         print(f"   🧠 正在进行深度周度分析 (共 {len(weekly_samples)} 周)...")
         
@@ -843,33 +999,60 @@ class AIAnalyzer:
         except ImportError:
             week_iter = weekly_samples
         
-        # 每周单独分析
+        # 每周单独分析 (带跨周上下文)
+        previous_summary = ""  # 用于连贯剧情
         for i, week_data in enumerate(week_iter):
             week_label = week_data['week']
             msgs = week_data['messages']
             if not msgs:
                 continue
                 
-            # 构建消息文本 (只取 user: content)
+            # 构建消息文本 (只取 user: content) - 扩大到 15000 字符
             msg_text = "\n".join([f"{m['user']}: {m['content']}" for m in msgs])
             
-            prompt = f"""请用温暖的视角，总结这周群聊中的温馨瞬间和有趣故事。
-{week_label} 消息记录：
-{msg_text[:3000]}  # 截断以防超长
+            # 构建跨周上下文
+            context_section = ""
+            if previous_summary:
+                context_section = f"""
+## 上周回顾（用于剧情连贯）：
+{previous_summary[:500]}
+---
+"""
+            
+            prompt = f"""你是群友们的年度回忆官，正在为大家撰写一份能勾起美好回忆的周报。
 
-请像给老朋友分享一样：
-1. 列出 2-3 个让人印象深刻的话题/故事
-2. 提取 1-2 个让人会心一笑的梗或金句
-3. 语气要温暖，让人读完嘴角上扬"""
+{context_section}## {week_label} 本周消息记录：
+{msg_text[:15000]}
+
+## 写作任务：
+请用温暖、怀旧的笔触，总结这周群里的温馨瞬间和有趣故事。
+
+## 写作要求：
+1. **具体事件**：列出 2-3 个让人印象深刻的话题或故事，要有细节（谁说了什么、发生了什么）
+2. **金句提取**：挑选 1-2 个让人会心一笑的梗或金句
+3. **剧情连贯**：如果有上周延续的话题，自然地串联起来
+4. **文风要求**：
+   - 像老朋友在回忆往事，娓娓道来
+   - 让群友读到时能想起当时的情景
+   - 语气温暖幽默，让人读完嘴角上扬
+
+## ⛔ 禁止事项：
+- 严禁提及分手、离婚、冲突、吵架、抱怨等负面话题
+- 如果消息中有负面内容，请忽略或转化为轻松的吐槽风格
+- 保持整体积极、温馨的基调"""
 
             try:
                 summary = self._call_api(
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.5,
-                    max_tokens=300
+                    messages=[
+                        {"role": "system", "content": "你是一位温暖的回忆录作家，擅长从日常对话中发现闪光时刻，用充满故事感的文字让读者重温美好。"},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.6,
+                    max_tokens=500
                 )
                 weekly_summaries_dict[week_label] = summary
                 weekly_summaries_text_list.append(f"### {week_label}\n{summary}")
+                previous_summary = summary  # 更新跨周上下文
                 print(f"     ✓ {week_label} 分析完成")
             except Exception as e:
                 logger.warning(f"{week_label} 分析失败: {e}")
@@ -885,27 +1068,59 @@ class AIAnalyzer:
 ## 任务：
 请生成一篇让人读完会心头一暖的年度回忆文章（Markdown格式）：
 
-1. **🎬 如果这一年是一部电影**：给它起个温暖的名字，写一段让人充满期待的"剧情简介"。
+### 🎬 如果这一年是一部电影
+给它起个温暖的名字，写一段让人充满期待的"剧情简介"（50字左右）。
 
-2. **🌟 年度高光时刻**：列出 5 个最值得纪念的温馨场景或欢乐事件，结合具体周的内容，让群友们能想起当时的快乐。
+### 🌟 年度高光时刻
+列出 5 个最值得纪念的温馨场景或欢乐事件：
+- 要结合具体周的内容细节
+- 让群友们能第一时间想起当时的快乐
+- 用画面感强的语言描述
 
-3. **📜 友谊编年史**：用时间线串起这一年的故事，像给未来的自己写信一样，记录大家的变化和成长。
+### 📜 友谊编年史
+用时间线串起这一年的故事：
+- 像给未来的自己写信一样
+- 记录大家的变化和成长
+- 突出那些"只有我们懂"的瞬间
 
-4. **💬 我们的专属记忆**：那些只有我们才懂的梗和口头禅，是这一年友谊的市场。
+### 💬 我们的专属记忆
+那些只有我们才懂的梗和口头禅：
+- 是这一年友谊的印记
+- 让每个读到的人会心一笑
 
-## 写作风格：
-- 像给最好的朋友写的年终信，字里行间都是温情
-- 让每个读到的人都能感受到"我们是一伙的"
-- 幽默中带着暖意，让人笑着笑着就觉得很幸福
-- 引用具体事件时，要让群友们能第一时间想起来"""
+## 写作风格要求：
+1. **勾起回忆**：像老朋友翻着相册聊往事，每个细节都能让人想起当时的情景
+2. **温情脉脉**：字里行间都是对群友的珍视，让读者感受到"我们是一伙的"
+3. **幽默暖心**：幽默中带着暖意，让人笑着笑着就觉得很幸福
+4. **细节为王**：引用具体的人名、事件、金句，让群友能第一时间对号入座
+
+## ⛔ 禁止事项：
+- 严禁提及分手、离婚、冲突、吵架、抱怨等负面话题
+- 保持整体积极、温馨、怀旧的基调"""
 
         try:
             print("   📝 正在生成年度深度总结...")
             content = self._call_api(
-                messages=[{"role": "user", "content": final_prompt}],
-                temperature=0.7,
-                max_tokens=1500
+                messages=[
+                    {"role": "system", "content": "你是一位文笔细腻的回忆录作家，擅长用温暖怀旧的笔触把平凡日常写成让人动容的故事。你的文字能勾起读者心底最柔软的回忆。"},
+                    {"role": "user", "content": final_prompt}
+                ],
+                temperature=0.75,
+                max_tokens=2500
             )
+            
+            # 保存缓存
+            if use_cache:
+                try:
+                    with open(cache_file, 'w', encoding='utf-8') as f:
+                        json.dump({
+                            'yearly_summary': content,
+                            'weekly_summaries': weekly_summaries_dict
+                        }, f, ensure_ascii=False, indent=2)
+                    print(f"   💾 周度分析已缓存")
+                except Exception as e:
+                    logger.warning(f"缓存保存失败: {e}")
+            
             return content, weekly_summaries_dict
         except Exception as e:
             logger.warning(f"年度总结生成失败: {e}")
@@ -1037,9 +1252,11 @@ class AIAnalyzer:
             user_iter = top_users
         
         for user in user_iter:
-            # 提取该用户的发言样本
-            user_msgs = df[df['user'] == user]['content'].sample(n=min(50, len(df[df['user'] == user]))).tolist()
-            msg_text = "\n".join(user_msgs)
+            # 提取该用户的发言样本 - 扩大到 1000 条以获得更准确的画像
+            user_df = df[df['user'] == user]
+            sample_size = min(1000, len(user_df))
+            user_msgs = user_df['content'].sample(n=sample_size).tolist()
+            msg_text = "\n".join(user_msgs)[:15000]  # 截断以控制 token
             
             prompt = f"""请为这位群友写一份温暖的人物画像，让 TA 感受到被看见和被喜爱。
 
