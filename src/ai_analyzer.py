@@ -836,8 +836,15 @@ class AIAnalyzer:
         weekly_summaries_dict = {}
         weekly_summaries_text_list = []
         
+        # 尝试使用 tqdm 进度条
+        try:
+            from tqdm import tqdm
+            week_iter = tqdm(weekly_samples, desc="   周度分析", unit="周", ncols=60)
+        except ImportError:
+            week_iter = weekly_samples
+        
         # 每周单独分析
-        for i, week_data in enumerate(weekly_samples):
+        for i, week_data in enumerate(week_iter):
             week_label = week_data['week']
             msgs = week_data['messages']
             if not msgs:
@@ -1022,7 +1029,14 @@ class AIAnalyzer:
         
         print(f"   👥 正在生成用户画像及 MBTI (分析前 {len(top_users)} 位活跃用户)...")
         
-        for user in top_users:
+        # 尝试使用 tqdm 进度条
+        try:
+            from tqdm import tqdm
+            user_iter = tqdm(top_users, desc="   用户画像", unit="人", ncols=60)
+        except ImportError:
+            user_iter = top_users
+        
+        for user in user_iter:
             # 提取该用户的发言样本
             user_msgs = df[df['user'] == user]['content'].sample(n=min(50, len(df[df['user'] == user]))).tolist()
             msg_text = "\n".join(user_msgs)
