@@ -5,22 +5,119 @@ main.py - 微信群聊分析工具主程序
 将各模块串联，实现完整的分析流程：
 1. 加载数据
 2. 统计分析
-3. AI 分析
-4. 生成报告
+3. 向量语义分析
+4. AI 深度分析（统一调度）
+5. 生成报告
 """
 
 import argparse
 import sys
 from pathlib import Path
+import os
 
-# 将 src 目录添加到路径
+# === 全局缓存配置 ===
+# 必须在导入 transformers/sentence_transformers 之前设置
+PROJECT_ROOT = Path(__file__).resolve().parent
+CACHE_DIR = PROJECT_ROOT / ".cache"
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+os.environ["HF_HOME"] = str(CACHE_DIR / "huggingface")
+os.environ["SENTENCE_TRANSFORMERS_HOME"] = str(CACHE_DIR / "models")
+# ====================
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
 from src.data_loader import load_chat_data
 from src.stats_engine import calculate_stats, format_stats_for_display, calculate_memories_stats
-from src.ai_analyzer import AIAnalyzer
+from src.ai import AIAnalyzer
 from src.vector_engine import SemanticAnalyzer
 from src.poster_builder import generate_poster_report
+from src.analyzers import get_monthly_analysis, get_yearly_highlights
+from src.analyzers.weekly_analyzer import get_weekly_samples_for_ai
+
+
+def run_ai_analysis(df, stats, vector_data, args):
+    """
+    统一的 AI 分析调度器。
+    
+    返回:
+        {
+            'topic_memories': [...],
+            'user_profiles_mbti': [...],
+            'weekly_ai_summary': '...',
+            'refined_keywords': [...],
+        }
+    """
+    result = {
+        'topic_memories': [],
+        'user_profiles_mbti': [],
+        'weekly_ai_summary': '',
+        'refined_keywords': None,
+    }
+    
+    if args.no_ai:
+        return result
+    
+    print("\n🧠 正在进行 AI 深度分析...")
+    analyzer = AIAnalyzer()
+    
+    if args.mock:
+        analyzer.mock_mode = True
+    
+    if analyzer.mock_mode:
+        print("   ⚠️ 使用 Mock 模式（未配置 API Key）")
+    else:
+        print(f"   ✓ 使用模型: {analyzer.model}")
+    
+    # 1. 周度分析
+    print("   📊 [1/4] 正在进行周度全量扫描...")
+    weekly_samples = get_weekly_samples_for_ai(df, max_per_week=1000)
+    weekly_ai_summary, weekly_summaries_dict = analyzer.analyze_weekly_batches(weekly_samples)
+    result['weekly_ai_summary'] = weekly_ai_summary
+    print("   ✓ 周度深度总结已生成")
+    
+    # 2. 月度话题回忆
+    monthly_data = get_monthly_analysis(df)
+    if monthly_data:
+        print("   📅 [2/4] 正在生成月度话题回忆...")
+        if weekly_summaries_dict:
+            result['topic_memories'] = analyzer.generate_monthly_summary_from_weekly(
+                monthly_data, weekly_summaries_dict
+            )
+        else:
+            result['topic_memories'] = analyzer.generate_topic_memories(monthly_data)
+        print(f"   ✓ 已生成 {len(result['topic_memories'])} 个月的话题回忆")
+    
+    # 3. 用户画像及 MBTI
+    print("   👥 [3/4] 正在生成用户画像...")
+    user_counts = df['user'].value_counts()
+    all_users = user_counts.index.tolist()
+    
+    if all_users:
+        # 计算用户语义特征向量
+        user_mbti_vectors = None
+        if vector_data and vector_data.get('total_analyzed', 0) > 0:
+            try:
+                print("   🧬 正在计算用户语义特征向量...")
+                semantic_analyzer = SemanticAnalyzer(n_clusters=vector_data.get('n_clusters', 6))
+                user_mbti_vectors = semantic_analyzer.analyze_users_for_mbti(df, all_users[:30])
+            except Exception as e:
+                print(f"   ⚠️ 用户语义特征计算失败: {e}")
+        
+        result['user_profiles_mbti'] = analyzer.generate_user_profiles_with_mbti(
+            df, all_users, user_vectors=user_mbti_vectors
+        )
+        print(f"   ✓ 已生成 {len(result['user_profiles_mbti'])} 位用户的 MBTI 画像")
+    
+    # 4. 年度关键词优化
+    yearly_data = get_yearly_highlights(df)
+    raw_keywords = yearly_data.get('keywords', [])
+    if raw_keywords:
+        print("   🏷️ [4/4] 正在筛选年度关键词...")
+        result['refined_keywords'] = analyzer.refine_keywords(raw_keywords)
+        print(f"   ✓ 已筛选 {len(result['refined_keywords'])} 个年度关键词")
+    
+    print("   ✓ AI 深度分析完成")
+    return result
 
 
 def main():
@@ -103,10 +200,11 @@ def main():
                     if not args.no_ai:
                         print("   🎲 正在为话题生成名称...")
                         ai_analyzer_for_naming = AIAnalyzer()
+                        if args.mock:
+                            ai_analyzer_for_naming.mock_mode = True
                         cluster_names = ai_analyzer_for_naming.summarize_clusters(
                             vector_data['cluster_representatives']
                         )
-                        # 更新聚类统计中的名称
                         for stat in vector_data['cluster_stats']:
                             cluster_id = stat['cluster_id']
                             if cluster_id in cluster_names:
@@ -122,27 +220,8 @@ def main():
                     traceback.print_exc()
                 vector_data = None
         
-        # Step 4: AI 分析
-        if args.no_ai:
-            print("\n🤖 跳过 AI 分析 (--no-ai)")
-            ai_result = {
-                'raw_content': '## AI 分析已跳过\n\n用户选择跳过 AI 分析功能。',
-                'is_mock': True
-            }
-        else:
-            print("\n🤖 正在进行 AI 分析...")
-            analyzer = AIAnalyzer()
-            
-            if args.mock:
-                analyzer.mock_mode = True
-            
-            if analyzer.mock_mode:
-                print("   ⚠️ 使用 Mock 模式（未配置 API Key）")
-            else:
-                print(f"   ✓ 使用模型: {analyzer.model}")
-            
-            ai_result = analyzer.analyze(df, stats['top_users'])
-            print("   ✓ AI 分析完成")
+        # Step 4: AI 深度分析（统一调度）
+        ai_data = run_ai_analysis(df, stats, vector_data, args)
         
         # Step 5: 怀旧数据挖掘
         print("\n⏳ 正在挖掘怀旧数据...")
@@ -152,22 +231,21 @@ def main():
             memories_data = {
                 'hot_messages': memories_stats['hot_messages'],
                 'peak_day': memories_stats['peak_day'],
-                'silence_breaker': memories_stats['silence_breaker'],
                 'first_messages': memories_stats['first_messages'],
                 'golden_quotes': [],
                 'peak_day_summary': ''
             }
             
-            # AI 甘选金句和生成巅峰日摘要
+            # AI 甄选金句和生成巅峰日摘要
             if not args.no_ai and memories_stats['hot_messages']:
-                print("   🎲 正在甘选金句...")
+                print("   🎲 正在甄选金句...")
                 ai_for_memories = AIAnalyzer()
                 if args.mock:
                     ai_for_memories.mock_mode = True
                 memories_data['golden_quotes'] = ai_for_memories.select_golden_quotes(
                     memories_stats['hot_messages']
                 )
-                print(f"   ✓ 已甘选 {len(memories_data['golden_quotes'])} 条金句")
+                print(f"   ✓ 已甄选 {len(memories_data['golden_quotes'])} 条金句")
                 
                 if memories_stats['peak_day'].get('date'):
                     print("   🏆 正在生成巅峰日摘要...")
@@ -175,9 +253,6 @@ def main():
                         memories_stats['peak_day']
                     )
                     print("   ✓ 巅峰日摘要完成")
-            
-            if memories_stats['silence_breaker']:
-                print(f"   ✓ 找到打破沉默的英雄: {memories_stats['silence_breaker']['user']}")
             
             print(f"   ✓ 怀旧数据挖掘完成")
             
@@ -192,6 +267,7 @@ def main():
         output_path = generate_poster_report(
             session_info=session_info,
             df=df,
+            ai_data=ai_data,
             memories_data=memories_data,
             output_dir=args.output,
             music_url=args.music,

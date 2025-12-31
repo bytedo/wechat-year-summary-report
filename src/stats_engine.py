@@ -213,7 +213,6 @@ def calculate_memories_stats(df: pd.DataFrame, top_users: List[Dict[str, Any]]) 
     return {
         'hot_messages': _find_hot_messages(df),
         'peak_day': _find_peak_day(df),
-        'silence_breaker': _find_silence_breaker(df),
         'first_messages': _get_first_messages(df, top_users),
     }
 
@@ -287,37 +286,6 @@ def _find_peak_day(df: pd.DataFrame) -> Dict[str, Any]:
     }
 
 
-def _find_silence_breaker(df: pd.DataFrame, silence_hours: int = 24) -> Optional[Dict[str, Any]]:
-    """
-    找出打破沉默（冷场 > N 小时）的消息。
-    
-    返回:
-        {'user': '打破沉默者', 'content': '消息', 'silence_hours': 沉默时长, 'timestamp': 时间}
-    """
-    if len(df) < 2:
-        return None
-    
-    df_sorted = df.sort_values('timestamp').reset_index(drop=True)
-    
-    max_gap = pd.Timedelta(0)
-    breaker_msg = None
-    
-    for i in range(1, len(df_sorted)):
-        prev_time = df_sorted.iloc[i - 1]['timestamp']
-        curr_time = df_sorted.iloc[i]['timestamp']
-        gap = curr_time - prev_time
-        
-        if gap > max_gap and gap >= pd.Timedelta(hours=silence_hours):
-            max_gap = gap
-            breaker_msg = {
-                'user': df_sorted.iloc[i]['user'],
-                'content': df_sorted.iloc[i]['content'][:100],
-                'silence_hours': round(gap.total_seconds() / 3600, 1),
-                'timestamp': curr_time,
-                'date': df_sorted.iloc[i]['date']
-            }
-    
-    return breaker_msg
 
 
 def _get_first_messages(df: pd.DataFrame, top_users: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

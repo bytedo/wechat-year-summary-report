@@ -892,6 +892,11 @@ class AIAnalyzer:
   "memory": "这个月，..."
 }}
 
+## ❗❗ 输出规则（必须严格遵守）：
+1. **只输出纯 JSON**，不要任何额外文字、注释或解释
+2. **不要使用 markdown 代码块**（不要用 ```json ```）
+3. **不要输出多个 JSON 对象**，只输出一个完整的 JSON
+
 ## 示例：
 {{
   "topics": [
@@ -1180,13 +1185,18 @@ class AIAnalyzer:
                 prompt = f"""以下是 {month_name} 里那些值得珍藏的群聊时光：
 {combined_weekly}
 
-请基于这些回忆，写一段 80-100 字的**月度温馨回忆**。
+请基于这些回忆，写一段 80-120 字的**月度温馨回忆**。
 同时提取 3 个最能触动人心的话题标签。
 
 写作指南：
 - 用"这个月"开头，让全文像是在给老朋友写信
 - 让群友读到时能想起那些快乐时光
 - 文字要温暖，像冬日里的一杯热茶
+
+## ❗❗ 输出规则（必须严格遵守）：
+1. **只输出纯 JSON**，不要任何额外文字、注释或解释
+2. **不要使用 markdown 代码块**（不要用 ```json ```）
+3. **不要输出多个 JSON 对象**，只输出一个完整的 JSON
 
 输出格式（JSON）：
 {{
@@ -1204,14 +1214,24 @@ class AIAnalyzer:
                     )
                     content = self._extract_content(response)
                     import json, re
-                    json_match = re.search(r'\{[\s\S]*\}', content)
-                    if json_match:
-                        res = json.loads(json_match.group())
-                        memory = res.get('memory', '')
-                        topics = res.get('topics', [])
-                    else:
-                        memory = content
-                        topics = []
+                    # 使用非贪婪匹配并逐个验证，只取第一个有效 JSON
+                    json_candidates = re.findall(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', content)
+                    memory = ''
+                    topics = []
+                    parsed_ok = False
+                    for candidate in json_candidates:
+                        try:
+                            res = json.loads(candidate)
+                            if 'memory' in res or 'topics' in res:
+                                memory = res.get('memory', '')
+                                topics = res.get('topics', [])
+                                parsed_ok = True
+                                break
+                        except:
+                            continue
+                    # 如果没有解析到有效 JSON，使用原始内容作为回忆
+                    if not parsed_ok and not memory:
+                        memory = content.strip() if content else ''
                 except Exception as e:
                     print(f"   ⚠️ {month_name} 汇总失败: {e}")
                     memory = self._mock_topic_memory(month_info)
@@ -1227,17 +1247,52 @@ class AIAnalyzer:
             
         return results
 
-    def generate_user_profiles_with_mbti(self, df: pd.DataFrame, top_users: List[str]) -> List[dict]:
+    def generate_user_profiles_with_mbti(
+        self, 
+        df: pd.DataFrame, 
+        top_users: List[str],
+        user_vectors: dict = None,
+        use_cache: bool = True
+    ) -> List[dict]:
         """
         生成用户画像及 MBTI 预测。
         
         参数:
             df: 完整消息 DataFrame
             top_users: 需要分析的用户列表 (用户名)
+            user_vectors: 可选，来自 vector_engine 的用户语义特征向量
+            use_cache: 是否使用缓存（默认开启）
             
         返回:
-            [{'user': '...', 'persona': '...', 'description': '...', 'mbti': '...'}, ...]
+            [{'user': '...', 'persona': '...', 'description': '...', 'mbti': '...', 'mbti_analysis': {...}}, ...]
         """
+        import hashlib
+        import json
+        from pathlib import Path
+        
+        # === 缓存处理 ===
+        cache_dir = Path(__file__).parent.parent / ".cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 计算缓存键（基于用户列表和消息数量）
+        cache_key_data = json.dumps({
+            'users': sorted(top_users[:30]),  # 只缓存前30位
+            'msg_count': len(df),
+            'has_vectors': user_vectors is not None
+        }, ensure_ascii=False, sort_keys=True)
+        cache_hash = hashlib.md5(cache_key_data.encode()).hexdigest()[:12]
+        cache_file = cache_dir / f"user_profiles_{cache_hash}.json"
+        
+        # 尝试读取缓存
+        if use_cache and cache_file.exists():
+            try:
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    cached_profiles = json.load(f)
+                    print(f"   💾 已加载用户画像缓存 ({len(cached_profiles)} 位用户)")
+                    return cached_profiles
+            except Exception as e:
+                logger.warning(f"缓存读取失败: {e}")
+        
         profiles = []
         if self.mock_mode:
             return self._mock_user_profiles_mbti(top_users)
@@ -1252,62 +1307,137 @@ class AIAnalyzer:
             user_iter = top_users
         
         for user in user_iter:
-            # 提取该用户的发言样本 - 扩大到 1000 条以获得更准确的画像
+            # 提取该用户的发言样本
             user_df = df[df['user'] == user]
             sample_size = min(1000, len(user_df))
             user_msgs = user_df['content'].sample(n=sample_size).tolist()
-            msg_text = "\n".join(user_msgs)[:15000]  # 截断以控制 token
+            msg_text = "\n".join(user_msgs)[:12000]  # 截断以控制 token
             
-            prompt = f"""请为这位群友写一份温暖的人物画像，让 TA 感受到被看见和被喜爱。
+            # 构建语义特征部分（如果有）
+            semantic_section = ""
+            if user_vectors and user in user_vectors:
+                uv = user_vectors[user]
+                style = uv.get('style_features', {})
+                topic_dist = uv.get('topic_distribution', {})
+                main_topics = list(topic_dist.keys())[:3]
+                
+                semantic_section = f"""
+## 用户语义特征（基于 embedding 分析）：
+- 发言数量：{uv.get('message_count', 0)} 条
+- 发言风格稳定性：{style.get('stability', '适中')}（标准差: {uv.get('std_value', 0):.3f}）
+- 与群体的差异度：{style.get('deviation', '合群')}（偏离分数: {uv.get('deviation_score', 0):.3f}）
+- 主要话题偏好：话题 {', '.join(map(str, main_topics))} （占比分别为 {', '.join([f'{topic_dist.get(t, 0):.1%}' for t in main_topics])}）
+
+请结合以上语义特征进行 MBTI 分析：
+- 「稳定」风格可能暗示 J（计划型）倾向
+- 「多变」风格可能暗示 P（灵活型）倾向
+- 「独特」表达可能暗示 N（直觉型）或 I（内向型）
+- 「合群」表达可能暗示 S（感知型）或 E（外向型）
+
+"""
+            
+            prompt = f"""请为这位群友写一份温暖的人物画像，并进行 MBTI 性格分析。
 
 ## 用户发言样本：
 {msg_text}
-
+{semantic_section}
 ## 任务：
-1. **温暖标签**：给 TA 一个充满喜爱的称号（如：深夜暖心小精灵、群里的小太阳、永远在线的温柔），4-6字。
-2. **画像描述**：用温暖的一句话描述 TA 在群里的样子，像是在向朋友介绍这个很特别的人。
-3. **MBTI 猜想**：根据发言风格猜测 TA 的 MBTI 人格（如 ENFP），并用括号简述为什么，语气要充满欣赏。
+1. **温暖标签**：给 TA 一个充满喜爱的称号（4-6字）
+2. **画像描述**：用温暖的一句话描述 TA（30字内）
+3. **MBTI 四维度分析**：对 E/I、S/N、T/F、J/P 四个维度分别判断，给出置信度（0-1）和简短理由
 
 ## 写作指南：
 - 想象你在向新朋友介绍"我们群里的宝藏朋友"
-- 让 TA 读到时会心一笑，感受到被珍视
-- 发现 TA 的闪光点，用温暖的方式表达
+- MBTI 分析要基于发言内容和语义特征，给出可解释的判断
+- 置信度反映你对该维度判断的确定程度
+
+## ❗❗ 输出规则（必须严格遵守）：
+1. **只输出纯 JSON**，不要任何额外文字
+2. **不要使用 markdown 代码块**
+3. **不要输出多个 JSON 对象**
 
 ## 输出格式（JSON）：
 {{
-  "persona": "...",
-  "description": "...",
-  "mbti": "..."
+  "persona": "温暖标签",
+  "description": "画像描述",
+  "mbti": "XXXX",
+  "mbti_analysis": {{
+    "E_I": {{"result": "E或I", "confidence": 0.0-1.0, "reason": "简短理由"}},
+    "S_N": {{"result": "S或N", "confidence": 0.0-1.0, "reason": "简短理由"}},
+    "T_F": {{"result": "T或F", "confidence": 0.0-1.0, "reason": "简短理由"}},
+    "J_P": {{"result": "J或P", "confidence": 0.0-1.0, "reason": "简短理由"}}
+  }}
 }}"""
 
             try:
                 content = self._call_api(
                     messages=[
-                        {"role": "system", "content": "你是一位充满欣赏的人物画像师，擅长发现每个人的闪光点，用温暖的文字让每个人都感受到被看见的喜悦。只输出JSON。"},
+                        {"role": "system", "content": "你是一位精通 MBTI 性格分析的画像师。基于用户发言和语义特征，给出稳定、可解释的 MBTI 判断。只输出JSON。"},
                         {"role": "user", "content": prompt}
                     ],
-                    temperature=0.7,
-                    max_tokens=200
+                    temperature=0.6,  # 降低温度以获得更稳定的结果
+                    max_tokens=400
                 )
                 
-                # 解析 JSON
+                # 解析 JSON - 使用更健壮的提取方式
                 import json
                 import re
-                json_match = re.search(r'\{[\s\S]*\}', content)
-                if json_match:
-                    res = json.loads(json_match.group())
+                json_candidates = re.findall(r'\{[^{}]*(?:\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}[^{}]*)*\}', content)
+                parsed = False
+                for candidate in json_candidates:
+                    try:
+                        res = json.loads(candidate)
+                        if 'persona' in res or 'mbti' in res:
+                            # 提取 MBTI 类型（从 mbti_analysis 构建或直接使用）
+                            mbti_analysis = res.get('mbti_analysis', {})
+                            if mbti_analysis:
+                                mbti_type = (
+                                    mbti_analysis.get('E_I', {}).get('result', 'I') +
+                                    mbti_analysis.get('S_N', {}).get('result', 'N') +
+                                    mbti_analysis.get('T_F', {}).get('result', 'F') +
+                                    mbti_analysis.get('J_P', {}).get('result', 'P')
+                                )
+                            else:
+                                mbti_type = res.get('mbti', 'INFP')
+                            
+                            profiles.append({
+                                'user': user,
+                                'persona': res.get('persona', '神秘群友'),
+                                'description': res.get('description', '暂无描述'),
+                                'mbti': mbti_type,
+                                'mbti_analysis': mbti_analysis
+                            })
+                            parsed = True
+                            break
+                    except:
+                        continue
+                if not parsed:
                     profiles.append({
-                        'user': user,
-                        'persona': res.get('persona', '神秘群友'),
-                        'description': res.get('description', '暂无描述'),
-                        'mbti': res.get('mbti', 'UNKNOWN')
+                        'user': user, 
+                        'persona': '神秘群友', 
+                        'description': content[:30] if content else '暂无描述', 
+                        'mbti': 'UNKNOWN',
+                        'mbti_analysis': {}
                     })
-                else:
-                     profiles.append({'user': user, 'persona': '神秘群友', 'description': content[:20], 'mbti': 'UNKNOWN'})
                      
             except Exception as e:
                 logger.warning(f"分析用户 {user} 失败: {e}")
-                profiles.append({'user': user, 'persona': '低调路人', 'description': '保持神秘', 'mbti': 'ISTJ'})
+                profiles.append({
+                    'user': user, 
+                    'persona': '低调路人', 
+                    'description': '保持神秘', 
+                    'mbti': 'ISTJ',
+                    'mbti_analysis': {}
+                })
+        
+        # 保存缓存
+        if use_cache and profiles:
+            try:
+                with open(cache_file, 'w', encoding='utf-8') as f:
+                    json.dump(profiles, f, ensure_ascii=False, indent=2)
+                print(f"   💾 用户画像已缓存")
+            except Exception as e:
+                logger.warning(f"缓存保存失败: {e}")
         
         return profiles
 

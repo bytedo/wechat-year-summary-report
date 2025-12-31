@@ -51,3 +51,4 @@ output
 
 # 临时目录
 tmp
+.cache

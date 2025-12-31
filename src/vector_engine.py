@@ -55,10 +55,16 @@ class SemanticAnalyzer:
         self.device = self._detect_device()
         
         # 缓存目录
+        # 缓存目录
         if cache_dir is None:
-            cache_dir = Path.home() / ".cache" / "wechat-analyze"
+            # 默认使用项目根目录下的 .cache/vectors
+            cache_dir = Path(__file__).parent.parent / ".cache" / "vectors"
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 模型缓存目录
+        self.model_cache_dir = self.cache_dir.parent / "models"
+        self.model_cache_dir.mkdir(parents=True, exist_ok=True)
         
         # 模型延迟加载
         self._model = None
@@ -93,7 +99,11 @@ class SemanticAnalyzer:
             
             try:
                 from sentence_transformers import SentenceTransformer
-                self._model = SentenceTransformer(self.model_name, device=self.device)
+                self._model = SentenceTransformer(
+                    self.model_name, 
+                    device=self.device,
+                    cache_folder=str(self.model_cache_dir)
+                )
                 print(f"   ✓ 模型加载完成 (设备: {self.device.upper()})")
             except Exception as e:
                 raise RuntimeError(f"模型加载失败: {e}")
@@ -367,6 +377,147 @@ class SemanticAnalyzer:
             'n_clusters': 0,
             'total_analyzed': 0
         }
+    
+    def analyze_users_for_mbti(
+        self,
+        df: pd.DataFrame,
+        top_users: List[str],
+        n_components: int = 24,
+        use_cache: bool = True
+    ) -> Dict[str, Dict]:
+        """
+        为用户画像生成基于语义 embedding 的 MBTI 分析向量。
+        
+        使用 PCA（非 t-SNE/UMAP）进行降维，保证结果稳定可复现。
+        
+        参数:
+            df: 消息数据 DataFrame（需包含 user, content 列）
+            top_users: 需要分析的用户列表
+            n_components: PCA 降维目标维度（默认 24）
+            use_cache: 是否使用向量缓存
+            
+        返回:
+            {
+                'user_name': {
+                    'mean_vector': List[float],      # 用户发言均值向量（降维后）
+                    'std_value': float,              # 发言风格稳定性（标准差均值）
+                    'message_count': int,            # 发言数量
+                    'topic_distribution': Dict,      # 用户在各话题簇中的分布比例
+                    'style_features': Dict,          # 语义风格特征描述
+                },
+                ...
+            }
+        """
+        from sklearn.decomposition import PCA
+        
+        print(f"   🧬 正在计算用户语义特征 (分析 {len(top_users)} 位用户)...")
+        
+        # 过滤有效消息
+        valid_df = self._filter_valid_messages(df)
+        if len(valid_df) < 100:
+            print("   ⚠️ 有效消息不足，跳过用户语义分析")
+            return {}
+        
+        # 获取所有消息的 embedding
+        contents = valid_df['content'].tolist()
+        embeddings = self._get_embeddings(contents, use_cache)
+        
+        # 进行聚类以获取话题分布
+        cluster_labels, cluster_centers = self._cluster(embeddings)
+        
+        # 为每个用户计算向量特征
+        user_vectors = {}
+        
+        for user in tqdm(top_users, desc="   用户向量", ncols=60):
+            # 获取该用户的所有消息索引
+            user_mask = valid_df['user'] == user
+            user_indices = np.where(user_mask)[0]
+            
+            if len(user_indices) < 5:
+                # 消息太少，跳过
+                continue
+            
+            # 获取用户的所有 embedding
+            user_embeddings = embeddings[user_indices]
+            
+            # 计算均值和标准差
+            mean_embedding = np.mean(user_embeddings, axis=0)
+            std_embedding = np.std(user_embeddings, axis=0)
+            std_value = float(np.mean(std_embedding))  # 风格稳定性指标
+            
+            # 计算话题分布
+            user_labels = cluster_labels[user_indices]
+            topic_counts = {}
+            for c in range(self.n_clusters):
+                count = int(np.sum(user_labels == c))
+                if count > 0:
+                    topic_counts[c] = count
+            
+            # 转换为比例
+            total = len(user_indices)
+            topic_distribution = {
+                k: round(v / total, 3) 
+                for k, v in sorted(topic_counts.items(), key=lambda x: -x[1])
+            }
+            
+            # 拼接均值与标准差形成特征向量
+            combined_vector = np.concatenate([mean_embedding, std_embedding])
+            
+            user_vectors[user] = {
+                'raw_vector': combined_vector,  # 临时存储，后续 PCA 处理
+                'std_value': std_value,
+                'message_count': len(user_indices),
+                'topic_distribution': topic_distribution,
+            }
+        
+        if not user_vectors:
+            print("   ⚠️ 没有足够数据生成用户向量")
+            return {}
+        
+        # 使用 PCA 对所有用户向量进行降维
+        print(f"   📐 正在进行 PCA 降维 (目标维度: {n_components})...")
+        
+        user_names = list(user_vectors.keys())
+        raw_vectors = np.array([user_vectors[u]['raw_vector'] for u in user_names])
+        
+        # 确保 n_components 不超过特征数和样本数
+        actual_components = min(n_components, raw_vectors.shape[0], raw_vectors.shape[1])
+        
+        pca = PCA(n_components=actual_components, random_state=42)
+        pca_vectors = pca.fit_transform(raw_vectors)
+        
+        print(f"   ✓ PCA 完成，解释方差比例: {sum(pca.explained_variance_ratio_):.2%}")
+        
+        # 计算全体用户的均值向量（用于比较）
+        all_mean = np.mean(pca_vectors, axis=0)
+        
+        # 更新用户向量，添加降维后的结果
+        for i, user in enumerate(user_names):
+            pca_vec = pca_vectors[i]
+            
+            # 计算与群体平均的偏离程度
+            deviation = float(np.linalg.norm(pca_vec - all_mean))
+            
+            # 生成风格特征描述
+            std_val = user_vectors[user]['std_value']
+            style_features = {
+                'stability': '稳定' if std_val < 0.3 else ('多变' if std_val > 0.5 else '适中'),
+                'deviation': '独特' if deviation > np.median([np.linalg.norm(pca_vectors[j] - all_mean) for j in range(len(user_names))]) else '合群',
+                'main_topics': list(user_vectors[user]['topic_distribution'].keys())[:3],
+            }
+            
+            # 更新字典，移除临时 raw_vector
+            user_vectors[user] = {
+                'mean_vector': pca_vec.tolist(),
+                'std_value': user_vectors[user]['std_value'],
+                'message_count': user_vectors[user]['message_count'],
+                'topic_distribution': user_vectors[user]['topic_distribution'],
+                'style_features': style_features,
+                'deviation_score': round(deviation, 3),
+            }
+        
+        print(f"   ✓ 已生成 {len(user_vectors)} 位用户的语义特征向量")
+        return user_vectors
 
 
 # 使用示例

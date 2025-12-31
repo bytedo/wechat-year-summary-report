@@ -23,7 +23,6 @@ from stats_engine import (
     _get_daily_trend,
     _get_hourly_distribution,
     _find_peak_day,
-    _find_silence_breaker,
     _find_hot_messages,
     _get_first_messages,
     calculate_memories_stats,
@@ -176,36 +175,6 @@ class TestFindPeakDay:
         assert result['date'] is None
 
 
-class TestFindSilenceBreaker:
-    """测试 _find_silence_breaker 函数"""
-    
-    def test_returns_none_for_short_df(self):
-        """测试短 DataFrame 返回 None"""
-        df = pd.DataFrame({
-            'user': ['A'],
-            'content': ['hi'],
-            'timestamp': [datetime.now()],
-            'date': ['2024-01-01']
-        })
-        result = _find_silence_breaker(df)
-        assert result is None
-    
-    def test_finds_long_silence(self):
-        """测试找到长时间沉默"""
-        df = pd.DataFrame({
-            'user': ['A', 'B'],
-            'content': ['消息1', '消息2'],
-            'timestamp': [
-                datetime(2024, 1, 1, 10, 0),
-                datetime(2024, 1, 3, 10, 0)  # 48 小时后
-            ],
-            'date': ['2024-01-01', '2024-01-03']
-        })
-        
-        result = _find_silence_breaker(df, silence_hours=24)
-        assert result is not None
-        assert result['user'] == 'B'
-        assert result['silence_hours'] >= 48
 
 
 class TestCalculateStats:

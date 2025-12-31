@@ -77,7 +77,8 @@ class YearlyAnalyzer:
             # 尝试每组采几个
             param_n = max(1, limit // 12)
             subset = candidates.groupby('month').apply(
-                lambda x: x.sample(n=min(len(x), param_n))
+                lambda x: x.sample(n=min(len(x), param_n)),
+                include_groups=False
             )
             # Flatten
             if isinstance(subset, pd.DataFrame):
@@ -205,7 +206,8 @@ class YearlyAnalyzer:
         
         # 最早发消息的人（每天最早）
         early_birds = self.df.groupby('date').apply(
-            lambda x: x.loc[x['timestamp'].idxmin()]['user']
+            lambda x: x.loc[x['timestamp'].idxmin()]['user'],
+            include_groups=False
         ).value_counts()
         
         # 夜猫子（23:00-03:00 发消息最多）
